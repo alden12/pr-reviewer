@@ -1,7 +1,7 @@
 /**
  * The reviewer on its own, with no dev server (DIST-2): `server.ts`'s server on loopback.
  *
- *   npx @attraverso/pr-reviewer serve [--port 5181] [--clone <checkout>]
+ *   npx @traverso/pr-reviewer serve [--port 5181] [--clone <checkout>]
  *
  * Run from the folder holding the plan, as reviews are: it serves the reviews beside that plan (`.attraverso/reviews/`,
  * `paths.ts`) and lists the open PRs of the repos under it, or of `--clone`.

@@ -217,9 +217,9 @@ export function pastReviews(inbox: Inbox, reviews: ReviewSummary[]): PastReview[
  */
 export function reviewCommand(row: Row, here: string | null): string {
   if (row.review.kind === "outdated" && row.review.canGoBack)
-    return `npx @attraverso/pr-reviewer back ${row.review.name} fetch`;
+    return `npx @traverso/pr-reviewer back ${row.review.name} fetch`;
   const clone = row.pr.repo === here ? "" : " --clone <path to its clone>";
-  return `npx @attraverso/pr-reviewer start ${row.pr.number}${clone}`;
+  return `npx @traverso/pr-reviewer start ${row.pr.number}${clone}`;
 }
 
 /**

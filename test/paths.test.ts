@@ -15,7 +15,7 @@ afterEach(() => folders.splice(0).forEach((dir) => rmSync(dir, { recursive: true
 
 describe("the package's own files", () => {
   it("are found from the package's root", () => {
-    expect(JSON.parse(readFileSync(join(PACKAGE, "package.json"), "utf8")).name).toBe("@attraverso/pr-reviewer");
+    expect(JSON.parse(readFileSync(join(PACKAGE, "package.json"), "utf8")).name).toBe("@traverso/pr-reviewer");
     expect(existsSync(join(PROMPTS, "review.md"))).toBe(true);
     expect(existsSync(BIN)).toBe(true);
     expect(PAGE).toBe(join(PACKAGE, "dist", "index.html"));

@@ -39,7 +39,7 @@ machine and don't apply in a cloud session.
 
 ## Reviews
 
-- **Make a review through the pipeline** (`npx @attraverso/pr-reviewer start`, the `review-pr` skill), never by writing
+- **Make a review through the pipeline** (`npx @traverso/pr-reviewer start`, the `review-pr` skill), never by writing
   `review.json` by hand: the hand-written ones are how a stale note got past the check (ARCH-4). A step that cannot
   do what a review needs is a change to that step or its prompt, made in the open.
 - **The review step is a fresh agent**, never the session that wrote the PR: it reviews what is there, not what was

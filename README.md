@@ -9,16 +9,16 @@ whose plan files it reads, and mirrored here commit by commit, so a pull request
 
 ## Using it
 
-Early, on npm as `@attraverso/pr-reviewer`. It needs Node 22, the GitHub CLI (`gh`, signed in) and an
+Early, on npm as `@traverso/pr-reviewer`. It needs Node 22, the GitHub CLI (`gh`, signed in) and an
 [attraverso](https://github.com/alden12/attraverso) plan: reviews run from the folder holding your `attraverso.yaml`,
 which supplies the repo's review rules, and the PR's repo is found among the checkouts under that folder.
 
 ```bash
 cd <the folder holding your attraverso.yaml>
-npx @attraverso/pr-reviewer start owner/repo#123    # or the PR's URL, or a number for the repo you're in
-npx @attraverso/pr-reviewer done <name>              # after each agent step has written its files
-npx @attraverso/pr-reviewer status <name>
-npx @attraverso/pr-reviewer serve                    # the app, on http://127.0.0.1:5181
+npx @traverso/pr-reviewer start owner/repo#123    # or the PR's URL, or a number for the repo you're in
+npx @traverso/pr-reviewer done <name>              # after each agent step has written its files
+npx @traverso/pr-reviewer status <name>
+npx @traverso/pr-reviewer serve                    # the app, on http://127.0.0.1:5181
 ```
 
 Some steps are code, the rest prompts for an agent such as Claude Code to follow: each hand-over prints the prompt

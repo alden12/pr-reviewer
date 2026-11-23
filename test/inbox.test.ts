@@ -140,9 +140,9 @@ describe("the home page's rows", () => {
     const [here, elsewhere, outdated] = rowsOf(inboxOf(open, [local("app-1", 1)]), [
       summary("app-1", 1, { commit: "older" }),
     ]);
-    expect(reviewCommand(here!, "me/app")).toBe("npx @attraverso/pr-reviewer start 3");
-    expect(reviewCommand(elsewhere!, "me/app")).toBe("npx @attraverso/pr-reviewer start 2 --clone <path to its clone>");
-    expect(reviewCommand(outdated!, "me/app")).toBe("npx @attraverso/pr-reviewer back app-1 fetch");
+    expect(reviewCommand(here!, "me/app")).toBe("npx @traverso/pr-reviewer start 3");
+    expect(reviewCommand(elsewhere!, "me/app")).toBe("npx @traverso/pr-reviewer start 2 --clone <path to its clone>");
+    expect(reviewCommand(outdated!, "me/app")).toBe("npx @traverso/pr-reviewer back app-1 fetch");
   });
 
   it("starts afresh for an out-of-date committed review, which has no run to send back", () => {
@@ -150,7 +150,7 @@ describe("the home page's rows", () => {
       summary("app-1", 1, { commit: "older" }),
     ]);
     expect(committed!.review).toMatchObject({ kind: "outdated", canGoBack: false });
-    expect(reviewCommand(committed!, "me/app")).toBe("npx @attraverso/pr-reviewer start 1");
+    expect(reviewCommand(committed!, "me/app")).toBe("npx @traverso/pr-reviewer start 1");
   });
 
   it("takes a PR's newest run, and a review with a local run before a committed one", () => {

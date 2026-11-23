@@ -61,7 +61,7 @@ const topLevel = (checkout: string): string =>
 export function runFrom(env: Record<string, string | undefined>): string {
   const from = env.PR_REVIEWER_FROM;
   if (from === undefined) {
-    throw new Error("run reviews with the pr-reviewer command (npx @attraverso/pr-reviewer), from your plan's folder");
+    throw new Error("run reviews with the pr-reviewer command (npx @traverso/pr-reviewer), from your plan's folder");
   }
   return from;
 }

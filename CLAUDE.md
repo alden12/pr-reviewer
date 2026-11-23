@@ -73,13 +73,13 @@ Carried over from another of Alden's repos until this repo earns its own.
 
 ## Commands
 
-Run from `packages/reviewer` (or `yarn workspace @attraverso/pr-reviewer <script>` from the root, whose `typecheck` and
+Run from `packages/reviewer` (or `yarn workspace @traverso/pr-reviewer <script>` from the root, whose `typecheck` and
 `test` include this package).
 
 - `yarn dev`: the app on http://localhost:5181.
 - `yarn verify`: typecheck, lint, format check, tests and build. Run before committing.
 - `yarn build`: one self-contained `dist/index.html`, so a review can be opened or shared as a file.
-- `npx @attraverso/pr-reviewer start|done|status|back` (`bin/pr-reviewer`, the package's `bin`, linked here by `yarn
+- `npx @traverso/pr-reviewer start|done|status|back` (`bin/pr-reviewer`, the package's `bin`, linked here by `yarn
   install`; never a bare `npx pr-reviewer`, since the registry's `pr-reviewer` is someone else's): make a review with the pipeline, started in the folder holding the plan, which
   gives the rules and Next lists. `<pr>` is a number (the repo it is run in), `owner/repo#123` or the PR's URL (found
   among the checkouts under that folder, so a plan above several repos works). It passes on where it was run from and
@@ -87,7 +87,7 @@ Run from `packages/reviewer` (or `yarn workspace @attraverso/pr-reviewer <script
   whose plan is the reviewer's own. The `review-pr` skill (`.claude/skills/` at the repo root) drives its agent steps.
   Every verb runs from the plan's folder too (usage atop `pipeline/run.ts`). Here it runs the source with vite-node,
   which compiles core's library in; installed, the build on plain Node.
-- `npx @attraverso/pr-reviewer serve`: the built app and its server for the reviews beside the plan, no dev server.
+- `npx @traverso/pr-reviewer serve`: the built app and its server for the reviews beside the plan, no dev server.
 - `yarn build` also builds the pipeline for the package (`vite.pipeline.config.ts`: `dist/pipeline/`, and the
   tree-sitter runtime and grammars copied into `dist/grammars/`). Publish from the public mirror with `npm publish`
   (a normal release, public from `publishConfig`; only attraverso's own previews take the `alpha` tag); Alden's, never

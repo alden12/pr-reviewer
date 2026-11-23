@@ -2,15 +2,15 @@
  * The pipeline's command line (`pr-reviewer`, bin/pr-reviewer). The state machine is `runner.ts`; this wires it to
  * the real steps, the local driver (printing what an agent step needs) and GitHub.
  *
- *   npx @attraverso/pr-reviewer start <pr> [--clone <path>] [--name <name>] [--project <key>]
+ *   npx @traverso/pr-reviewer start <pr> [--clone <path>] [--name <name>] [--project <key>]
  *
  * `<pr>` is its number, in the repo the run is started in, or `owner/repo#123` or the PR's URL, found among the
  * checkouts under the folder the run is started in (`target.ts`), so a run from a folder above several repos reviews
  * the right one. It is started through bin/pr-reviewer, in the folder holding the plan (`plan.ts`), which supplies the
  * rules and Next lists; the reviewed checkout's own plan, if it has one, isn't read.
- *   npx @attraverso/pr-reviewer done <name>              the agent step's files are written: check them, carry on
- *   npx @attraverso/pr-reviewer status <name>
- *   npx @attraverso/pr-reviewer back <name> <step>       go back to a step by hand
+ *   npx @traverso/pr-reviewer done <name>              the agent step's files are written: check them, carry on
+ *   npx @traverso/pr-reviewer status <name>
+ *   npx @traverso/pr-reviewer back <name> <step>       go back to a step by hand
  *
  * `--clone` overrides the checkout found, `--name` defaults to `<repo>-<pr>`; the review's folder is
  * `.attraverso/reviews/<name>/` beside the plan (`paths.ts`). From source it runs with vite-node, which compiles core's

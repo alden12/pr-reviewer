@@ -1,5 +1,5 @@
 {
-  "name": "@attraverso/pr-reviewer",
+  "name": "@traverso/pr-reviewer",
   "version": "0.1.0",
   "description": "A tool to make reviewing pull requests faster and clearer.",
   "license": "Apache-2.0",

@@ -41,7 +41,7 @@ export const hasTests = (tests: { files: unknown[]; tested: unknown[]; gaps: unk
 /** The command that sends this review back for another round of review. Read from the page's URL (none in Node). */
 export const reReviewCommand = (): string => {
   const search = (globalThis as { location?: { search: string } }).location?.search ?? "";
-  return `npx @attraverso/pr-reviewer back ${new URLSearchParams(search).get("review") ?? "<name>"} review`;
+  return `npx @traverso/pr-reviewer back ${new URLSearchParams(search).get("review") ?? "<name>"} review`;
 };
 
 /**
