@@ -56,7 +56,12 @@ export default defineConfig({
     rollupOptions: {
       // Kept as imports even here, where core is a linked workspace the bundler would otherwise read from source.
       external: [/^attraverso(\/|$)/, "yaml", "zod", /^node:/],
-      input: { run: join(here, "pipeline", "run.ts"), serve: join(here, "pipeline", "serve.ts") },
+      input: {
+        run: join(here, "pipeline", "run.ts"),
+        serve: join(here, "pipeline", "serve.ts"),
+        // What attraverso's viewer host imports, as `@attraverso/pr-reviewer/host` (DIST-2.2).
+        host: join(here, "pipeline", "viewerExtension.ts"),
+      },
       output: { format: "es", entryFileNames: "[name].js" },
     },
   },

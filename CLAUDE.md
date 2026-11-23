@@ -55,6 +55,9 @@ was fixed, test gaps, followable names). The pipeline's working files sit beside
   commits-since banner and the reading log, under `/api/`. The dev server and `serve` (`pipeline/server.ts`) mount
   them (`serveNode.ts` adapts them to `node:http`), as attraverso's viewer will from DIST-2's second slice; the app asks for
   them by relative URL. Without a server, the built file reads the committed reviews bundled into it.
+- `pipeline/viewerExtension.ts`: **the reviewer inside attraverso's viewer** (DIST-2.2), exported as
+  `@attraverso/pr-reviewer/host` (built to `dist/pipeline/host.js`): `host.ts`'s routes and the app under `/reviews/`,
+  which core's viewer host serves, with a PRs tab, when this package is installed beside it.
 - `docs/prototypes/`: the throwaway HTML prototypes this grew from. Not maintained.
 
 ## Coding conventions
