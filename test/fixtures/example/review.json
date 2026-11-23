@@ -1,0 +1,60 @@
+{
+  "pr": {
+    "repo": "example/app",
+    "number": 7,
+    "title": "Retry a failed request on a server error",
+    "head": "retry-5xx",
+    "base": "main",
+    "files": 5,
+    "added": 15,
+    "removed": 3,
+    "gist": "A request that fails with a server error is tried again, as many times as the config says.",
+    "tryIt": "gh pr checkout 7 && yarn test"
+  },
+  "verdict": "comment",
+  "steps": [
+    { "id": "config", "title": "Config: a retries setting", "files": ["src/config.ts"] },
+    { "id": "client", "title": "Client: retry on a 5xx", "files": ["src/client.ts"] },
+    { "id": "app", "title": "App: three retries", "files": ["src/app.ts"] }
+  ],
+  "blocks": {
+    "src/config.ts": [{ "title": "Config gains retries" }],
+    "src/client.ts": [
+      {
+        "title": "Retry once a server error comes back",
+        "why": "A 5xx is often transient; a 4xx is not.",
+        "explains": [11],
+        "sections": [{ "line": 13, "title": "The request, tried again" }],
+        "hints": [{ "line": 16, "text": "only one retry, whatever retries says" }]
+      }
+    ],
+    "src/app.ts": [{ "title": "The app asks for three" }]
+  },
+  "notForReview": [{ "path": "yarn.lock", "why": "Generated." }],
+  "tests": {
+    "files": ["test/client.test.ts"],
+    "tested": ["A 503 is tried again"],
+    "gaps": [
+      {
+        "id": "gap-4xx",
+        "title": "A 404 is not tried again",
+        "recommendation": "Add the 4xx case beside the 503 one."
+      }
+    ]
+  },
+  "comments": [
+    {
+      "id": "one-retry",
+      "kind": "question",
+      "path": "src/client.ts",
+      "match": "left > 0",
+      "title": "Only one retry",
+      "body": "retries is read as a yes or no: any count above zero retries exactly once.",
+      "recommendation": "Loop up to retries times, or rename the setting to say it is a switch."
+    }
+  ],
+  "names": {
+    "retries": { "what": "the setting, through each layer", "trace": true },
+    "retryFor": {}
+  }
+}

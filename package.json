@@ -1,0 +1,71 @@
+{
+  "name": "@attraverso/pr-reviewer",
+  "version": "0.1.0",
+  "description": "A tool to make reviewing pull requests faster and clearer.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "pr-reviewer": "bin/pr-reviewer"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "pipeline/prompts",
+    "LICENSE",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build && vite build --config vite.pipeline.config.ts",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "review": "vite-node pipeline/run.ts",
+    "serve": "vite-node pipeline/serve.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verify": "yarn typecheck && yarn lint && yarn format:check && yarn test && yarn build",
+    "prepublishOnly": "[ ! -d reviews ] || { echo 'refusing to publish: reviews/ holds reviews of private repos, which the build bundles in; publish from the public mirror' >&2; exit 1; } && yarn build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tree-sitter-grammars/tree-sitter-kotlin": "1.1.0",
+    "@types/node": "^24",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "@vscode/tree-sitter-wasm": "0.3.1",
+    "eslint": "^10.15.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.8",
+    "globals": "^17.14.0",
+    "prettier": "^3.10.1",
+    "tree-sitter-scala": "0.24.0",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.72.2",
+    "vite": "^8.3.8",
+    "vite-node": "^6.0.0",
+    "vite-plugin-singlefile": "^2.3.4",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "attraverso": "0.9.0",
+    "highlight.js": "^11.12.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "yaml": "^2.9.0",
+    "zod": "^4.6.7"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alden12/pr-reviewer.git"
+  }
+}

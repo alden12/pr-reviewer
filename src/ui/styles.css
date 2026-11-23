@@ -1,0 +1,1511 @@
+/* Layout: a familiar "files changed" view - file tree on the left, file cards on the right - reordered by flow. */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --sunk: #f0f2f5;
+  --fg: #1b2029;
+  --muted: #646d7e;
+  --faint: #9aa2b1;
+  --line: #dfe3e9;
+  --accent: #2a62c4;
+  --accent-soft: #e6eefb;
+  --add: #e8f5eb;
+  --add-num: #d3ecd9;
+  --del: #fbeaea;
+  /* The part of a line changed in place (`mark.chg`): a stronger shade of its line's colour. */
+  --add-strong: #abf2bc;
+  --del-strong: #ffc0c0;
+  --del-num: #f5d6d6;
+  --flash: #fff1b8;
+  --xlate-bg: #f1f5fd;
+  --nit: #9a5b00;
+  --nit-soft: #fcf1dc;
+  --question: #1b679b;
+  --question-soft: #e2eff8;
+  --gap: #a1372b;
+  --gap-soft: #fbe9e6;
+  --ok: #2a7343;
+  --removed: #c0392b;
+  --tok-keyword: #a0306e;
+  --tok-string: #1f6f43;
+  --tok-number: #8a4b08;
+  --tok-title: #5b3cc4;
+  --tok-type: #0f6672;
+  --tok-comment: #7c8596;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111419;
+    --surface: #181c23;
+    --sunk: #1e232b;
+    --fg: #e1e5ec;
+    --muted: #949db0;
+    --faint: #5f6878;
+    --line: #2a303b;
+    --accent: #7aa7ff;
+    --accent-soft: #1d2b45;
+    --add: #14271b;
+    --add-num: #1a3423;
+    --del: #2c1919;
+    --add-strong: #2e6b3e;
+    --del-strong: #7a2f2f;
+    --del-num: #3a2020;
+    --flash: #4a3d0f;
+    --xlate-bg: #18213a;
+    --nit: #e2b04a;
+    --nit-soft: #33290f;
+    --question: #6fb4e3;
+    --question-soft: #14283a;
+    --gap: #f08a7c;
+    --gap-soft: #351a17;
+    --ok: #6cc489;
+    --removed: #f08a7c;
+    --tok-keyword: #f07cb5;
+    --tok-string: #7fd19c;
+    --tok-number: #f0b36a;
+    --tok-title: #b4a2ff;
+    --tok-type: #6fd0dc;
+    --tok-comment: #6f798b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111419;
+  --surface: #181c23;
+  --sunk: #1e232b;
+  --fg: #e1e5ec;
+  --muted: #949db0;
+  --faint: #5f6878;
+  --line: #2a303b;
+  --accent: #7aa7ff;
+  --accent-soft: #1d2b45;
+  --add: #14271b;
+  --add-num: #1a3423;
+  --del: #2c1919;
+  --add-strong: #2e6b3e;
+  --del-strong: #7a2f2f;
+  --del-num: #3a2020;
+  --flash: #4a3d0f;
+  --xlate-bg: #18213a;
+  --nit: #e2b04a;
+  --nit-soft: #33290f;
+  --question: #6fb4e3;
+  --question-soft: #14283a;
+  --gap: #f08a7c;
+  --gap-soft: #351a17;
+  --ok: #6cc489;
+  --removed: #f08a7c;
+  --tok-keyword: #f07cb5;
+  --tok-string: #7fd19c;
+  --tok-number: #f0b36a;
+  --tok-title: #b4a2ff;
+  --tok-type: #6fd0dc;
+  --tok-comment: #6f798b;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.load-error {
+  max-width: 40rem;
+  margin: 3rem auto;
+  padding: 0 16px;
+}
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+button:focus-visible,
+input:focus-visible,
+.follow:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+code,
+.mono {
+  font-family: var(--font-mono);
+}
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* PR header */
+.pr {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.pr h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+.pr h1 span {
+  color: var(--muted);
+  font-weight: 400;
+}
+.meta {
+  color: var(--muted);
+  font-size: 13px;
+  display: flex;
+  gap: 6px 14px;
+  flex-wrap: wrap;
+}
+.meta .branch {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 0 6px;
+  border-radius: 4px;
+}
+.meta .plus {
+  color: var(--ok);
+  font-weight: 500;
+}
+.meta .minus {
+  color: var(--removed);
+  font-weight: 500;
+}
+.gist-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.gist {
+  font-size: 16px;
+  font-weight: 500;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.pill.verdict.approve {
+  background: var(--ok);
+  color: var(--surface);
+}
+.pill.verdict.comment {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.pill.verdict.request-changes,
+.pill.request-changes {
+  background: var(--gap);
+  color: var(--surface);
+}
+.pill.nit {
+  background: var(--nit-soft);
+  color: var(--nit);
+}
+.pill.question {
+  background: var(--question-soft);
+  color: var(--question);
+}
+.pill.gap {
+  background: var(--gap-soft);
+  color: var(--gap);
+}
+.try {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.try .label {
+  color: var(--muted);
+}
+.try code {
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12.5px;
+  user-select: all;
+}
+.try button {
+  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 8px;
+  background: var(--surface);
+}
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+}
+.comments-list button {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.comments-list button:hover .t {
+  text-decoration: underline;
+}
+
+/* What a jump scrolls to lands below the pinned toolbar and its file's pinned header, not under them. */
+html {
+  scroll-padding-top: calc(var(--toolbar-h, 48px) + 44px);
+}
+
+/* Toolbar: pinned, so progress stays in sight while reading */
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 8px 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--muted);
+}
+.toolbar .controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.toolbar button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 10px;
+  background: var(--surface);
+  color: var(--fg);
+}
+.toolbar button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.toolbar .plus {
+  color: var(--ok);
+  font-weight: 500;
+}
+.toolbar .minus {
+  color: var(--removed);
+  font-weight: 500;
+}
+.toolbar .of {
+  color: var(--muted);
+}
+.toolbar .progress {
+  font-variant-numeric: tabular-nums;
+}
+.hint {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Two columns */
+.layout {
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tree {
+    display: none !important;
+  }
+}
+.tree {
+  position: sticky;
+  /* Below the pinned toolbar, whose height it measures (Toolbar.tsx). */
+  top: calc(env(safe-area-inset-top, 0px) + var(--toolbar-h, 48px) + 8px);
+  max-height: calc(100vh - var(--toolbar-h, 48px) - 20px);
+  overflow-y: auto;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tree .group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.tree .group-name {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 0 8px 2px;
+}
+.tree .group-name b {
+  color: var(--fg);
+  font-weight: 600;
+}
+.tree button {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 3px 8px;
+  border-radius: 6px;
+  width: 100%;
+  min-width: 0;
+}
+.tree button:hover {
+  background: var(--sunk);
+}
+.tree .row {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+.tree .row.here {
+  background: var(--accent-soft);
+}
+.tree .row > button:first-child {
+  flex: 1;
+}
+/* The file's menu: out of the way until the row is hovered or it is open */
+.tree .kebab {
+  width: auto;
+  flex: none;
+  padding: 3px 6px;
+  color: var(--muted);
+  opacity: 0;
+}
+.tree .row:hover .kebab,
+.tree .row:focus-within .kebab,
+.tree .kebab[aria-expanded="true"] {
+  opacity: 1;
+}
+.tree .menu {
+  display: flex;
+  flex-direction: column;
+  margin: 2px 0 4px 16px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+}
+.tree .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.tree .dim .name {
+  color: var(--faint);
+}
+.tree .done .name {
+  text-decoration: line-through;
+  color: var(--faint);
+}
+.tree .stat {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.files,
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.step-divider {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 2px 0;
+}
+.step-divider .n {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.step-divider .t {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* File card */
+.file {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  /* clip, not hidden: hidden makes the card a scroll container, and the file's header couldn't stick */
+  overflow: clip;
+  scroll-margin-top: 16px;
+}
+/* Pinned under the toolbar while its file is on screen, so Viewed is in reach at the bottom of a long file */
+.file-head {
+  position: sticky;
+  top: var(--toolbar-h, 48px);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  background: var(--sunk);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.file.collapsed .file-head {
+  border-bottom: 0;
+}
+.file-head .chev {
+  color: var(--muted);
+  width: 14px;
+  flex: none;
+}
+.file-head .path {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.file-head .path .dir {
+  color: var(--muted);
+}
+.file-head .stat {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.file-head .stat .a {
+  color: var(--ok);
+}
+.file-head .stat .d {
+  color: var(--removed);
+}
+.file-head label {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+/* A ghost row wraps rather than squeezing: the path keeps its width (breaking anywhere only once it is wider than
+   the card), and the note drops below it on a narrow screen instead of crushing it to a letter per line. */
+.file.ghost .file-head {
+  background: var(--surface);
+  color: var(--faint);
+  flex-wrap: wrap;
+}
+.file.ghost .path {
+  color: var(--faint);
+  flex: 0 1 auto;
+}
+.ghost-note {
+  font-size: 12.5px;
+  color: var(--faint);
+  flex: 1 1 16em;
+  min-width: 0;
+}
+.scroll {
+  overflow-x: auto;
+}
+table.diff {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+table.diff td {
+  padding: 0;
+  vertical-align: top;
+}
+td.num {
+  width: 1%;
+  min-width: 42px;
+  padding: 0 8px !important;
+  text-align: right;
+  color: var(--faint);
+  user-select: none;
+  font-size: 11.5px;
+}
+td.sign {
+  width: 16px;
+  color: var(--faint);
+  user-select: none;
+  padding-left: 4px !important;
+}
+td.code {
+  /* Wrapped, not scrolled: a change at the end of a long line (a config value, a script) must be visible. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding-right: 16px !important;
+}
+/* The part of a line changed in place, against the line's own colour. */
+tr.add mark.chg {
+  background: var(--add-strong);
+  color: inherit;
+  border-radius: 2px;
+}
+tr.del mark.chg {
+  background: var(--del-strong);
+  color: inherit;
+  border-radius: 2px;
+}
+tr.add td {
+  background: var(--add);
+}
+tr.add td.num {
+  background: var(--add-num);
+}
+tr.del td {
+  background: var(--del);
+}
+tr.del td.num {
+  background: var(--del-num);
+}
+tr.flash td {
+  background: var(--flash) !important;
+  transition: background 0.2s;
+}
+
+/* Translation on: the real line steps back, the reader's language comes forward */
+tr.translated td.code,
+tr.translated td.sign {
+  opacity: 0.45;
+}
+tr.xlate td {
+  background: var(--xlate-bg);
+}
+tr.xlate td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+tr.xlate td.sign {
+  padding-left: 2px !important;
+}
+.lang-badge {
+  display: inline-block;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  padding: 2px 3px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: var(--surface);
+  vertical-align: 1px;
+}
+
+/* Code comments read as prose, still marked as comments */
+tr.note-row td.code {
+  white-space: normal;
+  padding-block: 3px !important;
+}
+.note {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--tok-comment);
+  max-width: 80ch;
+}
+.note-mark {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  white-space: nowrap;
+  flex: none;
+}
+.note-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.note-body p {
+  margin: 0;
+}
+.note-body code {
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--sunk);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+.note-code {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre;
+  overflow-x: auto;
+}
+tr.note-row.explains .note {
+  color: var(--fg);
+}
+tr.note-row.explains .note-mark {
+  color: var(--accent);
+  font-weight: 600;
+}
+tr.note-row.explains td.code {
+  box-shadow: inset 2px 0 0 var(--accent);
+  padding-left: 8px !important;
+}
+tr.note-row.superseded td.code {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--faint);
+  white-space: normal;
+}
+
+/* The heading for each block */
+tr.block td {
+  padding: 10px 12px 4px !important;
+  background: var(--surface);
+}
+tr.block:not(:first-child) td {
+  border-top: 1px solid var(--line);
+}
+.block-title {
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.block-title .ctx {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--faint);
+  font-weight: 400;
+}
+.block-title .refold {
+  font-size: 11.5px;
+  color: var(--accent);
+  font-weight: 400;
+}
+.block-why {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 1px;
+  max-width: 80ch;
+  white-space: normal;
+}
+.block-why .why-label {
+  font-weight: 600;
+  color: var(--faint);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+}
+
+/* A storytelling heading inside a block: lighter than the block's own, so the block still reads as one */
+tr.section td {
+  padding: 8px 12px 2px 52px !important;
+  background: var(--surface);
+}
+.section-title {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.section-why {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 80ch;
+  white-space: normal;
+}
+
+/* A hint the review wrote above a line: lighter than a section, at the code's indent like a comment */
+tr.hint td {
+  padding-top: 4px !important;
+  padding-bottom: 0 !important;
+}
+.hint-text {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--muted);
+  white-space: normal;
+}
+
+/* Where the code's own comments are hidden: a faint count, so the line numbers' jump is explained. */
+tr.hidden-comment td {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  line-height: 1.2;
+}
+tr.hidden-comment button {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  color: var(--faint);
+  cursor: pointer;
+}
+tr.hidden-comment button:hover {
+  color: var(--muted);
+}
+
+/* Folded block: still visibly there */
+tr.fold td {
+  padding: 4px 12px !important;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+tr.fold button {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--faint);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  width: 100%;
+}
+tr.fold button:hover {
+  color: var(--muted);
+}
+/* The kind and the count never wrap or shrink, so on a narrow screen the summary between them is what wraps. */
+tr.fold .kind {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  flex: none;
+  white-space: nowrap;
+}
+tr.fold .count {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  flex: none;
+  white-space: nowrap;
+}
+
+/* Syntax */
+.hljs-keyword {
+  color: var(--tok-keyword);
+}
+.hljs-string,
+.hljs-regexp {
+  color: var(--tok-string);
+}
+.hljs-number,
+.hljs-literal {
+  color: var(--tok-number);
+}
+.hljs-title,
+.hljs-title.function_ {
+  color: var(--tok-title);
+}
+.hljs-type,
+.hljs-built_in,
+.hljs-title.class_ {
+  color: var(--tok-type);
+}
+.hljs-comment,
+.cmt {
+  color: var(--tok-comment);
+  font-style: italic;
+}
+
+/* Followable names */
+.follow {
+  border-bottom: 1px dotted var(--accent);
+  cursor: pointer;
+}
+.follow:hover {
+  background: var(--accent-soft);
+  border-bottom-style: solid;
+}
+
+/* Findings: review comments and test gaps */
+tr.comment-row td {
+  padding: 6px 12px 8px 64px !important;
+  background: var(--surface);
+}
+@media (max-width: 600px) {
+  tr.comment-row td {
+    padding-left: 12px !important;
+  }
+}
+.finding {
+  font-family: var(--font-sans);
+  border-radius: 8px;
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 72ch;
+  white-space: normal;
+}
+.finding.nit {
+  background: var(--nit-soft);
+}
+.finding.question {
+  background: var(--question-soft);
+}
+.finding.gap {
+  background: var(--gap-soft);
+}
+.finding.request-changes {
+  background: var(--gap-soft);
+}
+.finding.resolved {
+  opacity: 0.75;
+}
+.finding .head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.finding p {
+  margin: 0;
+  font-size: 13.5px;
+}
+.rec {
+  border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  margin-top: 4px;
+  padding-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.rec-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  color: var(--muted);
+}
+.fix-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  font-size: 13px;
+}
+.fix-row .primary {
+  background: var(--accent);
+  color: var(--surface);
+  border-radius: 6px;
+  padding: 3px 12px;
+  font-weight: 500;
+}
+.fix-row .link {
+  color: var(--accent);
+}
+.fix-row .applied {
+  color: var(--ok);
+  font-weight: 600;
+}
+.fix-row .demo {
+  color: var(--muted);
+  font-size: 12px;
+}
+.fix-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 0 2px;
+  min-width: 0;
+}
+.fix-meta {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 0 10px;
+}
+.draft {
+  padding: 0 10px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Group card (tests) */
+.group-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scroll-margin-top: 16px;
+}
+.group-toggle {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.g-title {
+  font-weight: 600;
+}
+.g-sub {
+  color: var(--muted);
+  font-size: 13px;
+}
+.tested {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+}
+.tested .yes {
+  color: var(--ok);
+  font-weight: 500;
+}
+.gap-list,
+.group-card .inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Popover */
+.pop {
+  position: fixed;
+  z-index: 20;
+  width: min(440px, calc(100vw - 32px));
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(10, 20, 40, 0.18);
+  padding: 10px 0;
+  font-size: 13px;
+}
+.pop h3 {
+  margin: 0;
+  padding: 0 14px 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.pop h3 code {
+  font-size: 12.5px;
+  color: var(--accent);
+}
+.pop .sub {
+  padding: 0 14px 6px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.pop .step-label {
+  padding: 6px 14px 2px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+}
+.pop button {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 4px 14px;
+}
+.pop button:hover {
+  background: var(--sunk);
+}
+.pop .where {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.pop .where b {
+  color: var(--fg);
+  font-weight: 500;
+}
+.pop .snip {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pop .outside {
+  padding: 4px 14px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* The list of reviews, when more than one is bundled and none is named in the URL. */
+.picker {
+  max-width: 640px;
+  margin: 10vh auto;
+  padding: 0 16px;
+  font-family: system-ui, sans-serif;
+}
+
+/* A decision for the reader: the question, then its options, the recommended one first in weight. */
+.pill.decision {
+  background: #ede4ff;
+  color: #5b34b5;
+}
+.pill.fixed {
+  background: #e3f4e8;
+  color: #1f7a3d;
+}
+.not-rereviewed {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.pill.planned {
+  background: #e6eefb;
+  color: #2a62c4;
+}
+/* A file changed after the review by commits it didn't look at again: a call to action on its header. */
+.pill.unreviewed {
+  border: 0;
+  cursor: pointer;
+  background: var(--nit-soft);
+  color: var(--nit);
+  font: inherit;
+  font-size: 11.5px;
+}
+.decision-card {
+  max-width: 760px;
+  margin: 8px 0 8px 64px;
+  padding: 12px 14px;
+  border: 1px solid #c9b8f2;
+  border-radius: 10px;
+  background: #f7f3ff;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: normal;
+  color: var(--text, inherit);
+}
+.pr .decision-card {
+  margin-left: 0;
+}
+.decision-card .head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+}
+.decision-card p {
+  margin: 6px 0 10px;
+}
+.decision-card .options {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+.decision-card .options li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid #ddd2f7;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+}
+.decision-card .options li.recommended {
+  border-color: #9b7be6;
+}
+.decision-card .option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.decision-card .option-detail {
+  color: var(--muted, #555);
+}
+.decision-card .rec-badge {
+  align-self: flex-start;
+  font-size: 11px;
+  color: #5b34b5;
+}
+.decision-card button {
+  flex: none;
+  padding: 5px 10px;
+  border: 1px solid #c9b8f2;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.decision-card button.primary {
+  background: #6d46cf;
+  border-color: #6d46cf;
+  color: #fff;
+}
+.fixed {
+  margin: 10px 0;
+  font-size: 13px;
+}
+.fixed summary {
+  cursor: pointer;
+}
+.fixed ul {
+  margin: 6px 0 0;
+  padding-left: 22px;
+}
+.fixed-detail {
+  color: var(--muted, #555);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .decision-card {
+    background: #221a36;
+    border-color: #4a3a78;
+  }
+  :root:not([data-theme="light"]) .decision-card .options li {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: #3d3060;
+  }
+  :root:not([data-theme="light"]) .pill.decision {
+    background: #3a2a66;
+    color: #d9c9ff;
+  }
+  :root:not([data-theme="light"]) .pill.fixed {
+    background: #1d3a26;
+    color: #a8dcb5;
+  }
+  :root:not([data-theme="light"]) .pill.planned {
+    background: #1e2d48;
+    color: #a9c4f2;
+  }
+  :root:not([data-theme="light"]) .decision-card .option-detail,
+  :root:not([data-theme="light"]) .fixed-detail {
+    color: #a9b1bd;
+  }
+}
+
+/* The home page (INBOX-1): one list of open PRs, newest first, each with its review's state and one action. */
+.home {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 16px 64px;
+  font-family: system-ui, sans-serif;
+  color: var(--fg);
+}
+.home-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.home-head h1 {
+  margin: 0;
+  font-size: 22px;
+}
+.home-count {
+  color: var(--muted);
+  font-size: 13px;
+}
+.home .refresh {
+  margin-left: auto;
+}
+.home button,
+.home .action {
+  font: inherit;
+  font-size: 12.5px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+  text-decoration: none;
+}
+.home .action.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.home-failure {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--gap-soft);
+  color: var(--gap);
+}
+.home-loading,
+.home-empty,
+.home-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Filters: a row of chips per filter, the chosen one filled. */
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.chips-label {
+  width: 52px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.home .chips button {
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+.home .chips button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* A PR's row: who and when, its title, its state, and what to do. One that needs the reader has a warm edge. */
+.pr-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pr-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.pr-row.needs-you {
+  border-left-color: var(--nit);
+}
+.pr-meta,
+.pr-title,
+.pr-pills {
+  grid-column: 1;
+}
+.pr-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.pr-ref {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.author {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.author .avatar {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--sunk);
+  color: var(--fg);
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.author.me .avatar {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.pr-title {
+  color: var(--fg);
+  font-weight: 600;
+  font-size: 14.5px;
+  text-decoration: none;
+}
+.pr-title:hover {
+  text-decoration: underline;
+}
+.draft {
+  margin-right: 6px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.pr-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.pr-actions {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+}
+.home .pill.ok {
+  background: var(--add);
+  color: var(--ok);
+}
+.home .pill.run {
+  background: var(--question-soft);
+  color: var(--question);
+}
+.home .pill.bad {
+  background: var(--gap-soft);
+  color: var(--gap);
+}
+.home .pill.warn {
+  background: var(--nit-soft);
+  color: var(--nit);
+}
+.home .pill.none {
+  background: var(--sunk);
+  color: var(--muted);
+}
+@media (max-width: 560px) {
+  .pr-row {
+    grid-template-columns: 1fr;
+  }
+  .pr-actions {
+    grid-column: 1;
+    grid-row: auto;
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+}
+
+/* Past reviews, and every review here: closed until opened. */
+.past {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.past summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 13px;
+}
+.past ul {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+.past li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.past a {
+  color: var(--fg);
+}
+.past-name {
+  color: var(--muted);
+}
+.past-state {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Back to the open PRs (or the list of reviews), first in the sticky toolbar so it is always in reach. */
+.toolbar .back {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.toolbar .back:hover {
+  text-decoration: underline;
+}
+
+/* The commits a review doesn't cover, above its gist: warm, as anything waiting on the reader is. */
+.since-review {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--nit-soft);
+  color: var(--nit);
+  font-size: 13px;
+}
+.since-review ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.since-review a {
+  color: inherit;
+}

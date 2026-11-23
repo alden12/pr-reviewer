@@ -1,0 +1,46 @@
+# Narrate: the reading of the PR
+
+The reader should get what the PR is for and how it flows without reading every line, and be able to dig into any
+of it. Write for someone who knows the repo but not this change. Plain words, short; the repo's writing style
+(its `CLAUDE.md`) applies.
+
+## Read
+
+`pr.json`, `diff.json`, `findings.json`, `outcomes.json` (if there is one) and `folds.json`, plus the items the PR
+names in the repo's attraverso plan, for what it was meant to do.
+
+## Write `narrative.json`
+
+- **`gist`**: what the PR does for its user, in a sentence or two. Not a list of files.
+- **`tryIt`**: the command to see it working (`gh pr checkout <n> && ...`).
+- **`verdict`**: `approve`, `comment` or `request-changes`. Never milder than a finding left open: one that requests
+  changes and wasn't fixed means `request-changes`.
+- **`steps`**: the PR in reading order, the way the change flows (where data enters, then what it passes through),
+  not alphabetical. Each `{ id, title, short?, files }`. Every changed file is in a step, in `tests.files`, or in
+  `notForReview` with a reason (lockfiles, the plan file, generated output).
+- **`blocks`**: for each file in a step, one heading per hunk, in order: `{ title, why?, explains?, sections?,
+  hints? }`. The title says what the hunk does; `why` only when it isn't obvious from the title. A folded hunk still
+  needs a heading, since it is what the reader sees in its place. `explains` lists the new line numbers of code
+  comments worth reading as the explanation.
+- **`sections`** on a block: storytelling headings inside it, `{ line, title, why? }` at the new line a part starts
+  on, so wherever the eye lands there is a line saying what that part is for. **A short heading over each part of the
+  story, about 10 shown lines under each**: a function, a step in it, a case. Never more than 20 lines in a row
+  without one (the check sends a longer stretch back), and never a heading just to break up lines: each says what
+  its part does in the story, so the block reads as a few short steps. None in a hunk short enough to read at a
+  glance. A hunk that only changes comments is low value and stays out of the way: a short heading for its placeholder
+  ("X's doc brought up to date"), never the behaviour it describes, which the code's own block heads. **The code's
+  own comments are hidden by default**, so a section is where what's worth knowing from them goes: say it in the
+  title or why, in your words, rather than leaving it in a comment the reader won't see. A folded span still gets its
+  section above it: the heading is what tells the reader whether to open it.
+- **`hints`** on a block: short hints above a line, `{ line, text }`, lighter than a section, like a comment the
+  review writes: what a few lines or one dense line are doing, where that isn't worth a heading of its own. A
+  regex, a chained filter, a condition with three parts, a number whose meaning isn't on the line. A few words
+  (under ~60 characters, 100 at most), not a sentence about why: `sections` carry the story, hints only help read
+  the line. Never above a line inside a folded span, and never repeating the line ("calls fetch").
+- **`tests`**: `{ files, tested }`: the test files, and what they cover in a phrase each. Gaps are not yours to
+  write: the review step finds them as findings, so the fix step can close them.
+- **`names`**: identifiers worth clicking to follow through the diff, `{ "<name>": { what?, trace?, outside? } }`.
+  Only the few that carry the change.
+
+Findings, decisions and what was fixed are placed by the run from `findings.json` and `outcomes.json`: don't repeat
+them here.

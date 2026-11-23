@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# The reviewer's command (DIST-1): the pipeline, or `serve` for the app and its server, run from the folder holding
+# your attraverso plan. That folder is passed on as PR_REVIEWER_FROM: `start` takes the plan there and looks for the
+# PR's checkout under it.
+#
+#   pr-reviewer start acme/web#42      pr-reviewer done <name>      pr-reviewer status <name>      pr-reviewer serve
+#
+# Installed, it runs the package's build on plain Node (`dist/pipeline/`). In a checkout of the source it runs
+# `pipeline/*.ts` with vite-node from the reviewer's own folder, so vite-node loads this package's vite config, never
+# the one where it was run. A symlink to it works too, since it finds its package through one.
+set -euo pipefail
+
+package="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+export PR_REVIEWER_FROM="$PWD"
+script=run
+[ "${1:-}" = "serve" ] && { script=serve; shift; }
+
+if [ -f "$package/pipeline/$script.ts" ]; then
+  cd "$package"
+  for vite_node in "$package/node_modules/.bin/vite-node" "$package/../../node_modules/.bin/vite-node"; do
+    [ -x "$vite_node" ] && exec "$vite_node" "pipeline/$script.ts" "$@"
+  done
+  echo "pr-reviewer: no vite-node in $package's node_modules, or the monorepo's: run yarn install there" >&2
+  exit 1
+fi
+exec node "$package/dist/pipeline/$script.js" "$@"

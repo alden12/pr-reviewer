@@ -1,0 +1,15 @@
+node_modules
+dist
+coverage
+yarn.lock
+
+# Prose docs are hand-formatted; reformatting reflows them noisily
+*.md
+
+# The plan, written by the attraverso MCP server; leave it as the tool emits it
+attraverso.yaml
+.attraverso
+
+# Throwaway prototypes and generated review data
+docs/prototypes
+reviews/**/diff.json
