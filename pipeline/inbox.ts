@@ -136,13 +136,14 @@ const PAGE = 100;
 async function repoPulls(repo: string, me: string): Promise<{ pulls: ListedPull[]; more: number }> {
   const listed = await gh<ListedPull[]>(`repos/${repo}/pulls`, { state: "open", per_page: String(PAGE) });
   if (listed.length < PAGE) return { pulls: listed, more: 0 };
-  const search = (q: string) =>
+  const search = (q: string, perPage = PAGE) =>
     gh<{ items: SearchItem[]; total_count: number }>("search/issues", {
       q: `is:pr is:open repo:${repo}${q}`,
-      per_page: String(PAGE),
+      per_page: String(perPage),
     });
   const [all, authored, requested] = await Promise.all([
-    search(""),
+    // Only its total is read: `total_count` is the whole count whatever the page size, so ask for one item, not 100.
+    search("", 1),
     search(` author:${me}`),
     search(` review-requested:${me}`),
   ]);
