@@ -45,3 +45,6 @@ or section, the defaults: nothing assumed beyond this prompt) and the reviewed r
   you wrote.
 - **An empty list means it reads right.** Don't raise taste for its own sake: the bar is that the reader would
   stumble, or read what they didn't need to.
+
+Check what you wrote with the hand-over's `check:` line, which lists what is wrong and moves nothing on. Never run
+`done`: the session driving the run does, once you have finished.

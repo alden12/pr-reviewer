@@ -70,3 +70,6 @@ hints? }`. The title says what the hunk does; `why` only when it isn't obvious f
 
 Findings, decisions and what was fixed are placed by the run from `findings.json` and `outcomes.json`: don't repeat
 them here.
+
+Check what you wrote with the hand-over's `check:` line, which lists what is wrong and moves nothing on. Never run
+`done`: the session driving the run does, once you have finished.

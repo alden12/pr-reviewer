@@ -15,7 +15,7 @@ import {
   type Step,
   type StepId,
 } from "../pipeline/pipeline.ts";
-import { advance, finish, type Runner } from "../pipeline/runner.ts";
+import { advance, check, finish, type Runner } from "../pipeline/runner.ts";
 import {
   commitsSinceReview,
   filesChangedBy,
@@ -791,6 +791,30 @@ describe("the runner", () => {
     expect(await finish(dir, runner)).toEqual([]);
     expect(ran.at(-1)).toBe("check");
     expect(loadState(dir).at).toBe("done");
+  });
+
+  it("checks an agent step's files as finish does, but leaves the run where it was", async () => {
+    const objections = ["not yet"];
+    const { dir, runner } = setUp({ review: agent(["findings"], () => objections) });
+    await advance(dir, runner);
+    const before = loadState(dir);
+    expect(check(dir, runner)[0]).toMatch(/findings/);
+    workspace(dir).write("findings", { files: {}, findings: [] });
+    expect(check(dir, runner)).toEqual(["not yet"]);
+    objections.length = 0;
+    // The files check out, and still nothing moves: the agent may run this, and only `done` carries on.
+    expect(check(dir, runner)).toEqual([]);
+    expect(loadState(dir)).toEqual(before);
+    expect(before).toMatchObject({ at: "review", waiting: true });
+    // Refused where finish is: not waiting on an agent.
+    expect(await finish(dir, runner)).toEqual([]);
+    expect(() => check(dir, runner)).toThrow(/not waiting on an agent/);
+  });
+
+  it("refuses to check a code step that stopped the run, as finish does", () => {
+    const { dir, runner } = setUp({});
+    saveState(dir, { ...loadState(dir), at: "render", waiting: true });
+    expect(() => check(dir, runner)).toThrow(/code step/);
   });
 
   it("records a proofread send-back through the runner, at the head it happened", async () => {

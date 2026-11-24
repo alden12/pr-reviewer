@@ -1,25 +1,17 @@
 /**
  * The pipeline's command line (`pr-reviewer`, bin/pr-reviewer). The state machine is `runner.ts`; this wires it to
- * the real steps, the local driver (printing what an agent step needs) and GitHub.
- *
- *   npx @traverso/pr-reviewer start <pr> [--clone <path>] [--name <name>] [--project <key>]
+ * the real steps, the local driver (printing what an agent step needs) and GitHub. The verbs are `USAGE`, which
+ * `--help` prints.
  *
  * `<pr>` is its number, in the repo the run is started in, or `owner/repo#123` or the PR's URL, found among the
  * checkouts under the folder the run is started in (`target.ts`), so a run from a folder above several repos reviews
  * the right one. It is started through bin/pr-reviewer, in the folder holding the plan (`plan.ts`), which supplies the
- * rules and Next lists; the reviewed checkout's own plan, if it has one, isn't read.
- *   npx @traverso/pr-reviewer check <name>             check the agent step's files, without moving on (read-only)
- *   npx @traverso/pr-reviewer done <name>              the agent step's files are written: check them, carry on
- *   npx @traverso/pr-reviewer status <name>
- *   npx @traverso/pr-reviewer back <name> <step>       go back to a step by hand
- *   npx @traverso/pr-reviewer install-skill [--global]  put the review-pr skill where a session here finds it
- *
- * `--clone` overrides the checkout found, `--name` defaults to `<repo>-<pr>`; the review's folder is
+ * rules and Next lists; the reviewed checkout's own plan, if it has one, isn't read. The review's folder is
  * `.attraverso/reviews/<name>/` beside the plan (`paths.ts`). From source it runs with vite-node, which compiles core's
  * library in; the package runs its build (`dist/pipeline/run.js`) on plain Node.
  */
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { parseArgs } from "node:util";
@@ -40,6 +32,28 @@ import { DONE, hasState, loadState, logged, proofreadSendBacks, saveState, type 
  */
 const version = (JSON.parse(readFileSync(`${PACKAGE}/package.json`, "utf8")) as { version: string }).version;
 const command = (args: string[]) => `${RUNS_BUILT ? `npx -y @traverso/pr-reviewer@${version}` : BIN} ${args.join(" ")}`;
+
+/**
+ * What `--help` prints, and an unknown verb. Here rather than only in the comment above, which the published package
+ * doesn't ship: at work the way to say which checkout `--clone` meant was found by reading the source.
+ */
+const USAGE = (steps: string[]) =>
+  [
+    "usage: pr-reviewer <verb> ...",
+    "  start <pr> [--clone <path>] [--name <name>] [--project <key>]",
+    "        <pr>: its number (in the repo run from), owner/repo#123, or its URL. Run from the folder holding the plan.",
+    "        --clone: the checkout to read the diff from, when several hold the repo (a clone and its worktrees)",
+    "        --name: the review's name, <repo>-<pr> by default; --project: the plan's project whose rules apply",
+    "  check <name>                  check the agent step's files, without moving on (read-only: for that agent)",
+    "  done <name>                   the agent step's files are written: check them, carry on (the driving session)",
+    "  status <name>                 where a run is, and its history",
+    "  back <name> <step>            go back to a step by hand",
+    "  serve                         the reviewer's app and its server, from the plan's folder (bin/pr-reviewer)",
+    "  install-skill [--global] [--force]",
+    "        put the review-pr skill where a session here (or, --global, anywhere) finds it; --force replaces one",
+    "        that differs",
+    `steps: ${steps.join(", ")}`,
+  ].join("\n");
 
 /**
  * Prints what the agent step needs, for the session driving the run to do. Every agent step goes to a new agent, which
@@ -110,9 +124,15 @@ async function main(): Promise<void> {
       name: { type: "string" },
       project: { type: "string" },
       global: { type: "boolean" },
+      force: { type: "boolean" },
+      help: { type: "boolean", short: "h" },
     },
   });
   const [verb, target, extra] = positionals;
+  if (values.help || verb === "help") {
+    console.log(USAGE(STEP_IDS));
+    return;
+  }
   // A run's reviews are beside the plan it was started from (`paths.ts`), so every verb runs from that folder.
   const dirOf = (name: string, plan = planIn(runFrom(process.env))) => {
     if (plan === undefined)
@@ -169,8 +189,17 @@ async function main(): Promise<void> {
     const folder = join(values.global ? homedir() : runFrom(process.env), ".claude", "skills", "review-pr");
     mkdirSync(folder, { recursive: true });
     const skill = readFileSync(SKILL, "utf8").replaceAll("{{command}}", command([]).trimEnd());
-    writeFileSync(join(folder, "SKILL.md"), skill);
-    console.log(`review-pr skill written to ${join(folder, "SKILL.md")}: /review-pr <pr> in a Claude Code session`);
+    const path = join(folder, "SKILL.md");
+    // Never a silent overwrite: one that differs may be a repo's own (this monorepo keeps its own, differently worded)
+    // or the user's edits. An older install's differs too, if only in its command's version; telling it apart from
+    // those would be a guess, so it takes --force as well, which the refusal names.
+    if (existsSync(path) && readFileSync(path, "utf8") !== skill && !values.force) {
+      console.error(`${path} is there and differs from this version's skill: rerun with --force to replace it`);
+      process.exitCode = 1;
+      return;
+    }
+    writeFileSync(path, skill);
+    console.log(`review-pr skill written to ${path}: /review-pr <pr> in a Claude Code session`);
     return;
   }
   if (verb === "check" && target !== undefined) {
@@ -203,7 +232,7 @@ async function main(): Promise<void> {
     });
     return ended(target, await advance(dir, runnerFor(target, dir)));
   }
-  console.error(`usage: see the comment at the top of pipeline/run.ts (steps: ${STEP_IDS.join(", ")})`);
+  console.error(USAGE(STEP_IDS));
   process.exitCode = 1;
 }
 

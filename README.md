@@ -22,7 +22,8 @@ cd <the folder holding your attraverso.yaml>
 # (an alpha for now); a plain `npx attraverso` has no reviewer to find, and its viewer has no tab.
 claude mcp add --scope project attraverso -- npx -y -p attraverso@alpha -p @traverso/pr-reviewer attraverso
 
-# The review-pr skill, so /review-pr <pr> in Claude Code runs the whole loop.
+# The review-pr skill, so /review-pr <pr> in Claude Code runs the whole loop. It won't replace a SKILL.md that
+# differs (yours, or an older version's) without --force.
 npx -y @traverso/pr-reviewer install-skill
 ```
 

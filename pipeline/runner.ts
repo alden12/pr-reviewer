@@ -10,8 +10,9 @@ import { DONE, following, loadState, logged, saveState, type ReviewState } from 
 /**
  * Who runs an agent step. Locally it is the Claude Code session driving the run (the `review-pr` skill, which
  * `pr-reviewer install-skill` puts where a session finds it), so handing over is printing what to do: the session hands
- * the step to a new agent, and runs `done` itself once that agent has written its files. A CI run would be a second driver that sends the same prompt to the API with the
- * attraverso tools attached, waits, and calls `finish` itself; nothing else here would change.
+ * the step to a new agent, and runs `done` itself once that agent has written its files. A CI run would be a second
+ * driver that sends the same prompt to the API with the attraverso tools attached, waits, and calls `finish` itself;
+ * nothing else here would change.
  */
 export interface AgentDriver {
   /** `brief` is what this run adds to the prompt (the step's own `brief`), `problems` what it was sent back for. */

@@ -6,9 +6,10 @@ reviewer's plan).
 
 ## For each finding in `findings.json`
 
-- **Clear, and right:** fix it on the PR's branch in the clone (`pr.json` has the clone, branch and head). Follow the
-  repo's working rules: run its checks, commit with a message saying what and why, and push once at the end, with
-  any plan updates in the same push. Record it as `fixed`.
+- **Clear, and right:** fix it in the checkout the hand-over's `work in:` line names (the clone, or a worktree holding
+  the PR's branch; when it says none has the branch, check it out first as it says). Follow the repo's working rules:
+  run its checks, commit with a message saying what and why, and push once at the end, with any plan updates in the
+  same push. Record it as `fixed`.
 - **A choice the reader has to make** (product direction, scope, a trade-off with no right answer): record it as a
   `decision` with at least two options, the one you recommend marked. You may sharpen the reviewer's options.
 - **Right, but too big for this PR** (a refactor, a new feature, anything that would need its own review): file it
@@ -49,3 +50,6 @@ one round (`pipeline/loops.ts`); after that the reader decides whether to go aga
 
 The run fetches the diff again after this, so the review is of the head you pushed. A fixed finding's anchor may be
 gone by then, which is fine: fixed ones are listed, not anchored.
+
+Check what you wrote with the hand-over's `check:` line, which lists what is wrong and moves nothing on. Never run
+`done`: the session driving the run does, once you have finished.

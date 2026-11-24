@@ -89,5 +89,6 @@ earlier finding's id where it is the same problem, so its history follows it.
   decision for the PR's owner: give at least two `options`, and mark the one you recommend.
 - `match` must be on a line that is in the diff and not removed.
 - `files` names **every** path in `diff.json`; the check refuses a review with one missing.
-- **`review done` checks all of this for you** (every file listed, every `match` on a line, every unclear finding
-  with options) and lists what is wrong: run it rather than writing a checker of your own.
+- **The hand-over's `check:` line checks all of this for you** (every file listed, every `match` on a line, every
+  unclear finding with options) and lists what is wrong, moving nothing on: run it rather than writing a checker of
+  your own. Never run `done`: the session driving the run does, once you have finished.
