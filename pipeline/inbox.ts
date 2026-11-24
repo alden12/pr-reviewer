@@ -161,7 +161,10 @@ export const missingPulls = (listed: ListedPull[], found: SearchItem[][]): numbe
   return [...new Set(found.flat().map((item) => item.number))].filter((number) => !have.has(number));
 };
 
-/** A full page with the reader's PRs past it, and how many open PRs neither holds. */
+/**
+ * The first 100 open PRs with the reader's own older ones added, and a count of the open PRs left out (neither on
+ * that page nor the reader's), which the list shows as "and N more".
+ */
 export const pastPage = (
   listed: ListedPull[],
   fetched: ListedPull[],
