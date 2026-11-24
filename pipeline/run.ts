@@ -12,20 +12,22 @@
  *   npx @traverso/pr-reviewer done <name>              the agent step's files are written: check them, carry on
  *   npx @traverso/pr-reviewer status <name>
  *   npx @traverso/pr-reviewer back <name> <step>       go back to a step by hand
+ *   npx @traverso/pr-reviewer install-skill [--global]  put the review-pr skill where a session here finds it
  *
  * `--clone` overrides the checkout found, `--name` defaults to `<repo>-<pr>`; the review's folder is
  * `.attraverso/reviews/<name>/` beside the plan (`paths.ts`). From source it runs with vite-node, which compiles core's
  * library in; the package runs its build (`dist/pipeline/run.js`) on plain Node.
  */
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { parseArgs } from "node:util";
 import { ARTEFACTS, workspace } from "./artefacts.ts";
 import { pipeline, STEP_IDS, type StepId } from "./pipeline.ts";
 import { commitsSinceReview, reReviewRounds } from "./loops.ts";
 import { advance, check, finish, type AgentDriver, type Runner } from "./runner.ts";
-import { BIN, PACKAGE, PROMPTS, RUNS_BUILT, reviewsOf } from "./paths.ts";
+import { BIN, PACKAGE, PROMPTS, RUNS_BUILT, SKILL, reviewsOf } from "./paths.ts";
 import { planIn } from "./plan.ts";
 import { runFrom, startTarget } from "./target.ts";
 import { DONE, hasState, loadState, logged, proofreadSendBacks, saveState, type ReviewState } from "./state.ts";
@@ -103,7 +105,12 @@ const isStep = (value: string): value is StepId => (STEP_IDS as string[]).includ
 async function main(): Promise<void> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { clone: { type: "string" }, name: { type: "string" }, project: { type: "string" } },
+    options: {
+      clone: { type: "string" },
+      name: { type: "string" },
+      project: { type: "string" },
+      global: { type: "boolean" },
+    },
   });
   const [verb, target, extra] = positionals;
   // A run's reviews are beside the plan it was started from (`paths.ts`), so every verb runs from that folder.
@@ -156,6 +163,15 @@ async function main(): Promise<void> {
       process.exitCode = 1;
     }
     return ended(target, loadState(dir));
+  }
+  if (verb === "install-skill") {
+    // The skill names the command as this install has it, so what it tells a session to run is this version.
+    const folder = join(values.global ? homedir() : runFrom(process.env), ".claude", "skills", "review-pr");
+    mkdirSync(folder, { recursive: true });
+    const skill = readFileSync(SKILL, "utf8").replaceAll("{{command}}", command([]).trimEnd());
+    writeFileSync(join(folder, "SKILL.md"), skill);
+    console.log(`review-pr skill written to ${join(folder, "SKILL.md")}: /review-pr <pr> in a Claude Code session`);
+    return;
   }
   if (verb === "check" && target !== undefined) {
     const dir = dirOf(target);

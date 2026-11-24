@@ -15,6 +15,7 @@
     "bin",
     "dist",
     "pipeline/prompts",
+    "skill",
     "LICENSE",
     "README.md"
   ],

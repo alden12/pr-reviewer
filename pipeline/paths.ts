@@ -19,6 +19,9 @@ export const PACKAGE = rootFrom(import.meta.dirname);
 /** The agent steps' prompts, shipped as they are. */
 export const PROMPTS = join(PACKAGE, "pipeline", "prompts");
 
+/** The `review-pr` skill the package ships, which `install-skill` copies where a session finds it. */
+export const SKILL = join(PACKAGE, "skill", "review-pr", "SKILL.md");
+
 /** The command a hand-over tells the driving agent to run next, by its full path (see `run.ts`). */
 export const BIN = join(PACKAGE, "bin", "pr-reviewer");
 
