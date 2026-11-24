@@ -12,6 +12,10 @@ heading can't lean on the one above it, on the code below it, or on a comment th
   open PRs neither holds".
 - **Say what it does for the reader, in a whole thought**, not a compressed list of the code's nouns. If it takes a
   second read to work out what a heading means, rewrite it.
+- **Say what a bare name is, and spell out terms the reader may not hold.** A command, a flag or a function needs
+  its kind with it: "`pr-reviewer start` chooses which local copy of the repo to read the PR from when there are
+  several (the main checkout and its git worktrees)", not "start picks the right checkout when a repo has a clone and
+  worktrees".
 - **Don't copy the code's comments.** They are written for someone reading the code around them; say the point again
   in your own words.
 - Longer and clear beats short and cryptic.
