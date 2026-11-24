@@ -1,10 +1,12 @@
+import { reviewHref } from "./pane";
+
 /** A link to each review by name: the build's list, and the home page's "every review here". */
 export function ReviewLinks({ names }: { names: string[] }) {
   return (
     <ul>
       {names.map((name) => (
         <li key={name}>
-          <a href={`?review=${encodeURIComponent(name)}`}>{name}</a>
+          <a href={reviewHref(name)}>{name}</a>
         </li>
       ))}
     </ul>
