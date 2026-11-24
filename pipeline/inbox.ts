@@ -62,7 +62,7 @@ export interface ListedPull {
   head: { sha: string };
   requested_reviewers?: { login: string }[];
 }
-interface SearchItem {
+export interface SearchItem {
   number: number;
 }
 export interface Pull {
@@ -146,15 +146,29 @@ async function repoPulls(repo: string, me: string): Promise<{ pulls: ListedPull[
     search(` author:${me}`),
     search(` review-requested:${me}`),
   ]);
-  const have = new Set(listed.map((pull) => pull.number));
-  const missing = [...new Set([...authored.items, ...requested.items].map((item) => item.number))].filter(
-    (number) => !have.has(number),
+  const fetched = await mapLimited(
+    missingPulls(listed, [authored.items, requested.items]),
+    CONCURRENT_LOOKUPS,
+    (number) => gh<ListedPull>(`repos/${repo}/pulls/${number}`),
   );
-  const fetched = await mapLimited(missing, CONCURRENT_LOOKUPS, (number) =>
-    gh<ListedPull>(`repos/${repo}/pulls/${number}`),
-  );
-  return { pulls: [...listed, ...fetched], more: Math.max(0, all.total_count - listed.length - fetched.length) };
+  return pastPage(listed, fetched, all.total_count);
 }
+
+/** The reader's PRs the searches found that the listed page doesn't hold, each once however many searches found it. */
+export const missingPulls = (listed: ListedPull[], found: SearchItem[][]): number[] => {
+  const have = new Set(listed.map((pull) => pull.number));
+  return [...new Set(found.flat().map((item) => item.number))].filter((number) => !have.has(number));
+};
+
+/** A full page with the reader's PRs past it, and how many open PRs neither holds. */
+export const pastPage = (
+  listed: ListedPull[],
+  fetched: ListedPull[],
+  total: number,
+): { pulls: ListedPull[]; more: number } => ({
+  pulls: [...listed, ...fetched],
+  more: Math.max(0, total - listed.length - fetched.length),
+});
 
 /** The open PRs in `repos`, with their checks, and how many a repo had past what was listed. */
 async function openPrs(me: string, repos: string[]): Promise<{ open: OpenPr[]; more: number }> {

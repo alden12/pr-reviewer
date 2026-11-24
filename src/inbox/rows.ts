@@ -193,10 +193,22 @@ export const filterRows = (rows: Row[], { everything, author, repo, bots }: Filt
 
 /**
  * The repos found here that start ticked, ticked being what lists a repo's PRs. Nothing is asked of GitHub for an unticked one, which is what keeps
- * a folder of many nested repos quick; with nothing saved, only a lone repo starts ticked.
+ * a folder of many nested repos quick. A lone repo is always ticked, whatever was saved: the page draws no picker for
+ * one repo, so a saved tick that leaves it off (made in another checkout on the same origin) could never be undone.
  */
-export const initialTicks = (repos: string[], saved: string[] | null): string[] =>
-  saved === null ? (repos.length === 1 ? repos : []) : repos.filter((repo) => saved.includes(repo));
+export function initialTicks(repos: string[], saved: string[] | null): string[] {
+  if (repos.length === 1) return repos;
+  return saved === null ? [] : repos.filter((repo) => saved.includes(repo));
+}
+
+/**
+ * The ticks to save: this checkout's, beside those saved for repos it doesn't hold. The saved ticks are one list per
+ * browser origin, shared by every checkout served there, so saving only this checkout's would erase another's.
+ */
+export const mergeTicks = (saved: string[] | null, repos: string[], ticked: string[]): string[] => [
+  ...(saved ?? []).filter((repo) => !repos.includes(repo)),
+  ...ticked,
+];
 
 /** The values each filter offers, from the rows there are: the reader first among authors, then by name; bots' repos only while bots show. */
 export function filterOptions(

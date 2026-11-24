@@ -4,6 +4,7 @@ import {
   filterRows,
   initialTicks,
   involvesMe,
+  mergeTicks,
   otherReviews,
   inboxSchema,
   pastReviews,
@@ -34,13 +35,16 @@ const CHECKS: Record<NonNullable<Row["pr"]["checks"]>, { label: string; tone: st
   unknown: { label: "checks unknown", tone: "none" },
 };
 
-/** Why the list is empty: nothing open, nothing involving the reader, only bots' (hidden), or the filters. */
-const emptyNotice = (rows: Row[], bots: number, filters: Filters) => {
+/**
+ * Why the list is empty: nothing open, nothing involving the reader, only bots' (hidden), or the filters. `offered` is
+ * the rows the Show choice leaves, which `bots` was counted over, so the two are compared like for like.
+ */
+const emptyNotice = (rows: Row[], offered: Row[], bots: number, filters: Filters) => {
   const total = rows.length;
   if (total === 0) return "No open pull requests.";
   if (!filters.everything && !rows.some(involvesMe))
     return `None of the ${total} open pull requests are yours or ask for your review.`;
-  if (total === bots && !filters.bots && filters.author === null) return "Only bots' pull requests are open.";
+  if (offered.length === bots && !filters.bots && filters.author === null) return "Only bots' pull requests are open.";
   return "None match these filters.";
 };
 
@@ -297,9 +301,13 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
   const [failure, setFailure] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>({ everything: false, author: null, repo: null, bots: false });
   const [loads, setLoads] = useState(0);
+  // Refresh keeps the list on screen while GitHub is asked again, so this is what says it is being redrawn.
+  const [refreshing, setRefreshing] = useState(false);
 
-  // The repos first, from disk alone, so nothing slow runs before the reader has picked.
+  // The repos first, from disk alone, so nothing slow runs before the reader has picked. Asked again on Refresh only
+  // while they never came, so a failed first ask isn't stuck on "Looking for repos".
   useEffect(() => {
+    if (found !== null) return;
     fetch("api/repos")
       .then(async (response) => {
         const body = await response.text();
@@ -313,12 +321,13 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
         },
         (error: unknown) => setFailure(error instanceof Error ? error.message : String(error)),
       );
-  }, []);
+  }, [found, loads]);
 
   const tick = (repos: string[]) => {
     setFresh(null);
+    setRefreshing(false);
     setTicked(repos);
-    saveTicks(repos);
+    saveTicks(mergeTicks(savedTicks(), found?.repos ?? [], repos));
   };
 
   useEffect(() => {
@@ -335,9 +344,14 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
         (data) => {
           if (!current) return;
           setFresh(data);
+          setRefreshing(false);
           saveLastList(ticked, data);
         },
-        (error: unknown) => current && setFailure(error instanceof Error ? error.message : String(error)),
+        (error: unknown) => {
+          if (!current) return;
+          setRefreshing(false);
+          setFailure(error instanceof Error ? error.message : String(error));
+        },
       );
     return () => {
       current = false;
@@ -375,11 +389,14 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
         <h1>Pull requests</h1>
         {inbox && <span className="home-count">{needsYou > 0 ? `${needsYou} need you` : "nothing needs you"}</span>}
         {!fresh && last && !failure && <span className="home-count">updating, as of {ago(last.at)}…</span>}
+        {fresh && refreshing && !failure && <span className="home-count">updating…</span>}
         <button
           className="refresh"
           onClick={() => {
+            // The list on screen stays until the new one comes (INBOX-1.1), rather than falling back to the copy
+            // read from the browser at mount, which is older, or to nothing.
             setFailure(null);
-            setFresh(null);
+            setRefreshing(true);
             setLoads((count) => count + 1);
           }}
         >
@@ -444,7 +461,7 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
             )}
           </div>
           {shown.length === 0 ? (
-            <p className="home-empty">{emptyNotice(rows, options.bots, filters)}</p>
+            <p className="home-empty">{emptyNotice(rows, offered, options.bots, filters)}</p>
           ) : (
             <ul className="pr-list">
               {shown.map((row) => (

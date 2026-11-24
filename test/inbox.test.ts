@@ -6,16 +6,20 @@ import {
   combinedChecks,
   joinReviews,
   mapLimited,
+  missingPulls,
   nestedCheckouts,
+  pastPage,
   toOpenPr,
   repoFromRemote,
   reviewFolders,
+  type ListedPull,
   type Pull,
 } from "../pipeline/inbox.ts";
 import {
   filterOptions,
   filterRows,
   initialTicks,
+  mergeTicks,
   newestFirst,
   otherReviews,
   pastReviews,
@@ -130,6 +134,16 @@ describe("the home page's rows", () => {
     expect(initialTicks(["me/app"], null)).toEqual(["me/app"]);
     expect(initialTicks(["me/app", "me/site"], null)).toEqual([]);
     expect(initialTicks(["me/app", "me/site"], ["me/site", "me/gone"])).toEqual(["me/site"]);
+    // A lone repo has no picker to tick it with, so another checkout's ticks, or none, never leave it off.
+    expect(initialTicks(["me/app"], ["me/other"])).toEqual(["me/app"]);
+    expect(initialTicks(["me/app"], [])).toEqual(["me/app"]);
+    expect(initialTicks([], ["me/app"])).toEqual([]);
+  });
+
+  it("saves this checkout's ticks without erasing those saved for another's repos", () => {
+    expect(mergeTicks(["me/other", "me/site"], ["me/app", "me/site"], ["me/app"])).toEqual(["me/other", "me/app"]);
+    expect(mergeTicks(null, ["me/app", "me/site"], [])).toEqual([]);
+    expect(mergeTicks(["me/other"], ["me/app"], [])).toEqual(["me/other"]);
   });
 
   it("hides bots' PRs unless asked, and says how many", () => {
@@ -300,6 +314,30 @@ describe("the inbox's GitHub half", () => {
     expect(combinedChecks([], [checkRun("completed", "skipped"), checkRun("in_progress")])).toBe("pending");
     expect(combinedChecks(["pending"], [checkRun("completed", "failure")])).toBe("failure");
     expect(combinedChecks(["error"], [])).toBe("failure");
+  });
+
+  it("past a full page, fetches each of the reader's PRs the page lacks once, and counts the rest", () => {
+    const listedPull = (number: number): ListedPull => ({
+      number,
+      title: `PR ${number}`,
+      html_url: `https://github.com/me/app/pull/${number}`,
+      created_at: "2026-11-01T00:00:00Z",
+      user: { login: "ann" },
+      head: { sha: "x" },
+    });
+    const page = Array.from({ length: 100 }, (_, index) => listedPull(index + 1));
+    // 150 is both authored and asked of the reader, 5 is already on the page.
+    const missing = missingPulls(page, [
+      [{ number: 150 }, { number: 5 }],
+      [{ number: 150 }, { number: 160 }],
+    ]);
+    expect(missing).toEqual([150, 160]);
+    expect(missingPulls(page, [[], []])).toEqual([]);
+    const past = pastPage(page, [listedPull(150)], 230);
+    expect(past.pulls).toHaveLength(101);
+    expect(past.more).toBe(129);
+    // A search count behind the listing (GitHub's index lags) never reads as a negative count.
+    expect(pastPage(page, [], 90).more).toBe(0);
   });
 
   it("maps with a limit on how many run at once, keeping order", async () => {
