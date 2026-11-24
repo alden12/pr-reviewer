@@ -305,9 +305,12 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
   const [refreshing, setRefreshing] = useState(false);
 
   // The repos first, from disk alone, so nothing slow runs before the reader has picked. Asked again on Refresh only
-  // while they never came, so a failed first ask isn't stuck on "Looking for repos".
+  // while they never came, so a failed first ask isn't stuck on "Looking for repos". Guarded like the inbox below: a
+  // Refresh during a slow scan starts a newer ask, and the older answer must not land after it (re-asking GitHub, or a
+  // late failure shown over repos that did come).
   useEffect(() => {
     if (found !== null) return;
+    let current = true;
     fetch("api/repos")
       .then(async (response) => {
         const body = await response.text();
@@ -316,11 +319,18 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
       })
       .then(
         (data) => {
+          if (!current) return;
           setFound(data);
           setTicked(initialTicks(data.repos, savedTicks()));
         },
-        (error: unknown) => setFailure(error instanceof Error ? error.message : String(error)),
+        (error: unknown) => {
+          if (!current) return;
+          setFailure(error instanceof Error ? error.message : String(error));
+        },
       );
+    return () => {
+      current = false;
+    };
   }, [found, loads]);
 
   const tick = (repos: string[]) => {
