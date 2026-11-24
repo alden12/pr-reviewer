@@ -11,7 +11,7 @@
  * library in; the package runs its build (`dist/pipeline/run.js`) on plain Node.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { parseArgs } from "node:util";
@@ -21,6 +21,7 @@ import { commitsSinceReview, reReviewRounds } from "./loops.ts";
 import { advance, check, finish, type AgentDriver, type Runner } from "./runner.ts";
 import { BIN, PACKAGE, PROMPTS, RUNS_BUILT, SKILL, reviewsOf } from "./paths.ts";
 import { planIn } from "./plan.ts";
+import { installSkill } from "./skill.ts";
 import { runFrom, startTarget } from "./target.ts";
 import { DONE, hasState, loadState, logged, proofreadSendBacks, saveState, type ReviewState } from "./state.ts";
 
@@ -187,18 +188,13 @@ async function main(): Promise<void> {
   if (verb === "install-skill") {
     // The skill names the command as this install has it, so what it tells a session to run is this version.
     const folder = join(values.global ? homedir() : runFrom(process.env), ".claude", "skills", "review-pr");
-    mkdirSync(folder, { recursive: true });
     const skill = readFileSync(SKILL, "utf8").replaceAll("{{command}}", command([]).trimEnd());
     const path = join(folder, "SKILL.md");
-    // Never a silent overwrite: one that differs may be a repo's own (this monorepo keeps its own, differently worded)
-    // or the user's edits. An older install's differs too, if only in its command's version; telling it apart from
-    // those would be a guess, so it takes --force as well, which the refusal names.
-    if (existsSync(path) && readFileSync(path, "utf8") !== skill && !values.force) {
+    if (installSkill(path, skill, values.force === true) === "refused") {
       console.error(`${path} is there and differs from this version's skill: rerun with --force to replace it`);
       process.exitCode = 1;
       return;
     }
-    writeFileSync(path, skill);
     console.log(`review-pr skill written to ${path}: /review-pr <pr> in a Claude Code session`);
     return;
   }
