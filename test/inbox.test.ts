@@ -14,6 +14,7 @@ import {
 import {
   filterOptions,
   filterRows,
+  initialTicks,
   newestFirst,
   otherReviews,
   pastReviews,
@@ -104,14 +105,36 @@ describe("the home page's rows", () => {
 
   it("filters by author and repo, and offers the reader first", () => {
     const rows = rowsOf(inboxOf([pr(1), pr(2, { author: "zed" }), pr(3, { author: "ann", repo: "me/site" })]), []);
-    expect(filterRows(rows, { author: "zed", repo: null, bots: false }).map((row) => row.pr.number)).toEqual([2]);
-    expect(filterRows(rows, { author: null, repo: "me/site", bots: false }).map((row) => row.pr.number)).toEqual([3]);
+    expect(
+      filterRows(rows, { everything: true, author: "zed", repo: null, bots: false }).map((row) => row.pr.number),
+    ).toEqual([2]);
+    expect(
+      filterRows(rows, { everything: true, author: null, repo: "me/site", bots: false }).map((row) => row.pr.number),
+    ).toEqual([3]);
     expect(filterOptions(rows, "me")).toEqual({ authors: ["me", "ann", "zed"], repos: ["me/app", "me/site"], bots: 0 });
+  });
+
+  it("shows only the PRs involving the reader unless asked for everything", () => {
+    const rows = rowsOf(
+      inboxOf([pr(1), pr(2, { author: "zed" }), pr(3, { author: "ann", reviewRequested: true })]),
+      [],
+    );
+    const shown = (everything: boolean) =>
+      filterRows(rows, { everything, author: null, repo: null, bots: false }).map((row) => row.pr.number);
+    expect(shown(false)).toEqual([3, 1]);
+    expect(shown(true)).toEqual([3, 2, 1]);
+  });
+
+  it("starts with a lone repo ticked, else what was saved and is still here", () => {
+    expect(initialTicks(["me/app"], null)).toEqual(["me/app"]);
+    expect(initialTicks(["me/app", "me/site"], null)).toEqual([]);
+    expect(initialTicks(["me/app", "me/site"], ["me/site", "me/gone"])).toEqual(["me/site"]);
   });
 
   it("hides bots' PRs unless asked, and says how many", () => {
     const rows = rowsOf(inboxOf([pr(1), pr(2, { author: "dependabot[bot]" })]), []);
-    const shown = (bots: boolean) => filterRows(rows, { author: null, repo: null, bots }).map((row) => row.pr.number);
+    const shown = (bots: boolean) =>
+      filterRows(rows, { everything: true, author: null, repo: null, bots }).map((row) => row.pr.number);
     expect(shown(false)).toEqual([1]);
     expect(shown(true)).toEqual([2, 1]);
     expect(filterOptions(rows, "me")).toEqual({ authors: ["me"], repos: ["me/app"], bots: 1 });

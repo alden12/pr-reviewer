@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   filterOptions,
   filterRows,
+  initialTicks,
+  involvesMe,
   otherReviews,
   inboxSchema,
   pastReviews,
@@ -32,9 +34,12 @@ const CHECKS: Record<NonNullable<Row["pr"]["checks"]>, { label: string; tone: st
   unknown: { label: "checks unknown", tone: "none" },
 };
 
-/** Why the list is empty: nothing open, only bots' (hidden), or the filters. */
-const emptyNotice = (total: number, bots: number, filters: Filters) => {
+/** Why the list is empty: nothing open, nothing involving the reader, only bots' (hidden), or the filters. */
+const emptyNotice = (rows: Row[], bots: number, filters: Filters) => {
+  const total = rows.length;
   if (total === 0) return "No open pull requests.";
+  if (!filters.everything && !rows.some(involvesMe))
+    return `None of the ${total} open pull requests are yours or ask for your review.`;
   if (total === bots && !filters.bots && filters.author === null) return "Only bots' pull requests are open.";
   return "None match these filters.";
 };
@@ -136,6 +141,54 @@ function FilterChips({
   );
 }
 
+/** Where the ticked repos are remembered, per browser: a convenience, so a blocked storage just means ticking again. */
+const TICKED_KEY = "pr-reviewer:repos";
+const savedTicks = (): string[] | null => {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(TICKED_KEY) ?? "null");
+    return Array.isArray(saved) ? saved.filter((repo): repo is string => typeof repo === "string") : null;
+  } catch {
+    return null;
+  }
+};
+const saveTicks = (repos: string[]) => {
+  try {
+    localStorage.setItem(TICKED_KEY, JSON.stringify(repos));
+  } catch {
+    // Not remembered this time; the ticks still apply to this page.
+  }
+};
+
+function RepoPicker({
+  repos,
+  ticked,
+  onChange,
+}: {
+  repos: string[];
+  ticked: string[];
+  onChange: (ticked: string[]) => void;
+}) {
+  return (
+    <div className="chips repo-picker" role="group" aria-label="Repos to list">
+      <span className="chips-label">Repos</span>
+      {repos.map((repo) => {
+        const on = ticked.includes(repo);
+        return (
+          <button
+            key={repo}
+            aria-pressed={on}
+            title={repo}
+            onClick={() => onChange(on ? ticked.filter((each) => each !== repo) : [...ticked, repo])}
+          >
+            {on ? "✓ " : ""}
+            {repo.split("/")[1] ?? repo}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
  * Reviews no list above links, so every review stays one click away: a review of another repo, of a PR GitHub couldn't
  * read, or an older run. Before GitHub has answered (or when it can't), that is all of them.
@@ -211,19 +264,47 @@ function cameFrom(): string | null {
 }
 
 /**
- * The reviewer's home page (INBOX-1): every open PR in this repo and the repos nested in it, newest first, with its review's state and
+ * The reviewer's home page (INBOX-1): the open PRs of the repos ticked among this one and those nested in it (by
+ * default only the reader's and those asking for their review), newest first, with its review's state and
  * the one thing to do next; then the reviews kept here whose PR has merged or closed. The data comes from the
  * reviewer's server, which asks GitHub (`api/inbox`, `pipeline/host.ts`); the reviews come from it too (`api/reviews`).
  */
 export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: string[] }) {
+  const [found, setFound] = useState<{ here: string | null; repos: string[] } | null>(null);
+  const [ticked, setTicked] = useState<string[]>([]);
   const [inbox, setInbox] = useState<Inbox | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
-  const [filters, setFilters] = useState<Filters>({ author: null, repo: null, bots: false });
+  const [filters, setFilters] = useState<Filters>({ everything: false, author: null, repo: null, bots: false });
   const [loads, setLoads] = useState(0);
 
+  // The repos first, from disk alone, so nothing slow runs before the reader has picked.
   useEffect(() => {
+    fetch("api/repos")
+      .then(async (response) => {
+        const body = await response.text();
+        if (!response.ok) throw new Error(body || `the server answered ${response.status}`);
+        return JSON.parse(body) as { here: string | null; repos: string[] };
+      })
+      .then(
+        (data) => {
+          setFound(data);
+          setTicked(initialTicks(data.repos, savedTicks()));
+        },
+        (error: unknown) => setFailure(error instanceof Error ? error.message : String(error)),
+      );
+  }, []);
+
+  const tick = (repos: string[]) => {
+    setInbox(null);
+    setTicked(repos);
+    saveTicks(repos);
+  };
+
+  useEffect(() => {
+    if (found === null || ticked.length === 0) return;
     let current = true;
-    fetch("api/inbox")
+    const query = new URLSearchParams(ticked.map((repo) => ["repo", repo]));
+    fetch(`api/inbox?${query}`)
       .then(async (response) => {
         const body = await response.text();
         if (!response.ok) throw new Error(body || `the server answered ${response.status}`);
@@ -236,11 +317,13 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
     return () => {
       current = false;
     };
-  }, [loads]);
+  }, [found, ticked, loads]);
 
   const rows = useMemo(() => (inbox ? rowsOf(inbox, reviews) : []), [inbox, reviews]);
   const shown = filterRows(rows, filters);
-  const options = inbox ? filterOptions(rows, inbox.me, filters.bots) : { authors: [], repos: [], bots: 0 };
+  // Offered from the rows the Show choice leaves, so no chip narrows to nothing.
+  const offered = filters.everything ? rows : rows.filter(involvesMe);
+  const options = inbox ? filterOptions(offered, inbox.me, filters.bots) : { authors: [], repos: [], bots: 0 };
   const needsYou = rows.filter((row) => row.needsYou).length;
   // Inside attraverso's viewer the host says where its plan is (`api/host`); served on its own, there is none.
   const [plan, setPlan] = useState<string | null>(null);
@@ -267,6 +350,7 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
           className="refresh"
           onClick={() => {
             setFailure(null);
+            setInbox(null);
             setLoads((count) => count + 1);
           }}
         >
@@ -285,10 +369,26 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
           )}
         </p>
       )}
-      {!inbox && !failure && <p className="home-loading">Asking GitHub…</p>}
+      {found && found.repos.length > 1 && <RepoPicker repos={found.repos} ticked={ticked} onChange={tick} />}
+      {found && found.repos.length === 0 && <p className="home-empty">No GitHub repos found here.</p>}
+      {found && found.repos.length > 0 && ticked.length === 0 && (
+        <p className="home-empty">Tick a repo to list its pull requests.</p>
+      )}
+      {!inbox && !failure && (found === null || ticked.length > 0) && (
+        <p className="home-loading">{found === null ? "Looking for repos…" : "Asking GitHub…"}</p>
+      )}
       {inbox && (
         <>
           <div className="filters">
+            <div className="chips" role="group" aria-label="Show">
+              <span className="chips-label">Show</span>
+              <button aria-pressed={!filters.everything} onClick={() => setFilters({ ...filters, everything: false })}>
+                Yours and asked of you
+              </button>
+              <button aria-pressed={filters.everything} onClick={() => setFilters({ ...filters, everything: true })}>
+                Everything
+              </button>
+            </div>
             <FilterChips
               label="Author"
               values={options.authors}
@@ -315,7 +415,7 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
             )}
           </div>
           {shown.length === 0 ? (
-            <p className="home-empty">{emptyNotice(rows.length, options.bots, filters)}</p>
+            <p className="home-empty">{emptyNotice(rows, options.bots, filters)}</p>
           ) : (
             <ul className="pr-list">
               {shown.map((row) => (

@@ -5,7 +5,8 @@
  * reviews (`api/reviews`).
  *
  * One list, newest first, rather than groups by who is waiting on whom (Alden, 2026-11-22): who wrote each PR shows
- * on its row, and a filter narrows to one person or one repo.
+ * on its row, and a filter narrows to one person or one repo. By default it holds only the PRs involving the reader,
+ * and only for the repos they tick (2026-11-24).
  */
 import { z } from "zod";
 import { reviewSchema } from "../review/schema";
@@ -163,6 +164,11 @@ export function rowsOf(inbox: Inbox, reviews: ReviewSummary[]): Row[] {
 }
 
 export interface Filters {
+  /**
+   * Every PR in the ticked repos, rather than only those involving the reader (theirs, or asking for their review).
+   * Off by default (Alden, 2026-11-24): a busy repo's whole list buries the few that are the reader's business.
+   */
+  everything: boolean;
   /** `null` for everyone, else one login. */
   author: string | null;
   repo: string | null;
@@ -173,13 +179,24 @@ export interface Filters {
 /** A GitHub App's login, such as `dependabot[bot]`. */
 export const isBot = (login: string): boolean => login.endsWith("[bot]");
 
-export const filterRows = (rows: Row[], { author, repo, bots }: Filters): Row[] =>
+/** The reader wrote it, or is asked to review it. */
+export const involvesMe = (row: Row): boolean => row.mine || row.pr.reviewRequested;
+
+export const filterRows = (rows: Row[], { everything, author, repo, bots }: Filters): Row[] =>
   rows.filter(
     (row) =>
+      (everything || involvesMe(row)) &&
       (author === null || row.pr.author === author) &&
       (repo === null || row.pr.repo === repo) &&
       (bots || author !== null || !isBot(row.pr.author)),
   );
+
+/**
+ * The repos found here that start ticked, ticked being what lists a repo's PRs. Nothing is asked of GitHub for an unticked one, which is what keeps
+ * a folder of many nested repos quick; with nothing saved, only a lone repo starts ticked.
+ */
+export const initialTicks = (repos: string[], saved: string[] | null): string[] =>
+  saved === null ? (repos.length === 1 ? repos : []) : repos.filter((repo) => saved.includes(repo));
 
 /** The values each filter offers, from the rows there are: the reader first among authors, then by name; bots' repos only while bots show. */
 export function filterOptions(

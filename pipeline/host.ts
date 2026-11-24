@@ -14,7 +14,7 @@
 import { appendFileSync, existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isReviewName, readingEventSchema } from "../src/review/reading.ts";
-import { commitsSince, loadInbox } from "./inbox.ts";
+import { commitsSince, listRepos, loadInbox } from "./inbox.ts";
 
 export interface ReviewerHostOptions {
   /** The committed reviews' folder (`reviews/`): read, never written. */
@@ -94,6 +94,12 @@ export function reviewerHost({ committed, local, clone }: ReviewerHostOptions): 
     return valid ? commitsSince(repo, Number(number), from).then(json, failed) : status(400);
   };
 
+  /** The open PRs of the ticked repos: `?repo=owner/name&repo=...`, none asked for being an empty list. */
+  const inbox = (query: URLSearchParams): Promise<Response> | Response => {
+    const chosen = query.getAll("repo");
+    return chosen.every(isRepo) ? loadInbox([committed, local], clone, chosen).then(json, failed) : status(400);
+  };
+
   /**
    * What the reader opens and folds back (KNOW-4), appended to a local review's `reading.jsonl` for the judge step.
    * JSON only: a page elsewhere can post plain text here without asking first, but not JSON.
@@ -118,7 +124,8 @@ export function reviewerHost({ committed, local, clone }: ReviewerHostOptions): 
     const routes: Record<string, () => Promise<Response> | Response> = {
       reviews: () => (get ? reviews() : status(405)),
       diff: () => (get && isReviewName(name) ? diff(name) : status(404)),
-      inbox: () => (get ? loadInbox([committed, local], clone).then(json, failed) : status(405)),
+      repos: () => (get ? listRepos(clone).then(json, failed) : status(405)),
+      inbox: () => (get ? inbox(url.searchParams) : status(405)),
       since: () => (get ? since(url.searchParams) : status(405)),
       reading: () => (request.method === "POST" ? reading(request, name) : status(405)),
     };

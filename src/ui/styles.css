@@ -1517,3 +1517,8 @@ tr.comment-row td {
 .since-review a {
   color: inherit;
 }
+
+/* The repos to list: a tick is what lets GitHub be asked about one. */
+.repo-picker {
+  margin-bottom: 12px;
+}

@@ -243,13 +243,27 @@ export const remoteOf = async (checkout: string): Promise<string | null> =>
     (await run("git", ["remote", "get-url", "origin"], { cwd: checkout }).catch(() => ({ stdout: "" }))).stdout,
   );
 
-/** Everything the home page shows, for the reader `gh` is signed in as; `clone` is this checkout. */
-export async function loadInbox(reviewRoots: string[], clone: string): Promise<Inbox> {
-  const { login: me } = await gh<{ login: string }>("user");
+/**
+ * The repos the home page can list (this checkout's first, then those nested in it), read from disk with no call to
+ * GitHub, so the page can offer them as a checklist before anything slow runs: a folder of many nested repos is
+ * hundreds of PRs, and only the ticked repos are asked about (Alden, 2026-11-24).
+ */
+export async function listRepos(clone: string): Promise<{ here: string | null; repos: string[] }> {
   const top = await run("git", ["rev-parse", "--show-toplevel"], { cwd: clone }).catch(() => ({ stdout: clone }));
   const remotes = await Promise.all(nestedCheckouts(top.stdout.trim()).map(remoteOf));
-  const here = remotes[0] ?? null;
-  const repos = [...new Set(remotes.filter((remote): remote is string => remote !== null))];
+  return {
+    here: remotes[0] ?? null,
+    repos: [...new Set(remotes.filter((remote): remote is string => remote !== null))],
+  };
+}
+
+/**
+ * Everything the home page shows, for the reader `gh` is signed in as; `clone` is this checkout. Only the repos in
+ * `chosen` that the checkout holds are asked about: one it doesn't hold is ignored rather than trusted from a query.
+ */
+export async function loadInbox(reviewRoots: string[], clone: string, chosen: string[]): Promise<Inbox> {
+  const [{ login: me }, found] = await Promise.all([gh<{ login: string }>("user"), listRepos(clone)]);
+  const repos = found.repos.filter((repo) => chosen.includes(repo));
   // Past reviews follow the same repos as the open list.
   const folders = reviewFolders(reviewRoots).filter((folder) => repos.includes(folder.repo));
   const keys = [...new Set(folders.map((folder) => `${folder.repo}#${folder.number}`))];
@@ -260,7 +274,7 @@ export async function loadInbox(reviewRoots: string[], clone: string): Promise<I
       return [key, await gh<Pull>(`repos/${repo}/pulls/${number}`).catch(() => null)] as const;
     }),
   ]);
-  return { me, here, open, more, reviews: joinReviews(folders, new Map(pulls), repos) };
+  return { me, here: found.here, open, more, reviews: joinReviews(folders, new Map(pulls), repos) };
 }
 
 /** The PR's head now, and the commits after `reviewed` up to it (GitHub's compare, one call). */
