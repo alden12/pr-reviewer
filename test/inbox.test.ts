@@ -7,6 +7,7 @@ import {
   joinReviews,
   mapLimited,
   nestedCheckouts,
+  toOpenPr,
   repoFromRemote,
   reviewFolders,
   type Pull,
@@ -192,6 +193,31 @@ describe("the home page's rows", () => {
     expect(row!.review).toMatchObject({ kind: "current", name: "app-1-local" });
     const committed = [summary("app-1-a", 1, { commit: "head1" }), summary("app-1-b", 1, { commit: "head1" })];
     expect(rowsOf(inboxOf([pr(1)]), committed)[0]!.review).toMatchObject({ name: "app-1-b" });
+  });
+
+  it("reads a listed pull as a row's PR, marking one asking for the reader's review", () => {
+    const pull = {
+      number: 7,
+      title: "Seven",
+      html_url: "https://github.com/me/app/pull/7",
+      created_at: "2026-11-07T00:00:00Z",
+      user: { login: "ann" },
+      head: { sha: "abc" },
+      requested_reviewers: [{ login: "zed" }, { login: "me" }],
+    };
+    expect(toOpenPr("me/app", pull, "me", "success")).toEqual({
+      repo: "me/app",
+      number: 7,
+      title: "Seven",
+      author: "ann",
+      url: "https://github.com/me/app/pull/7",
+      createdAt: "2026-11-07T00:00:00Z",
+      draft: false,
+      head: "abc",
+      checks: "success",
+      reviewRequested: true,
+    });
+    expect(toOpenPr("me/app", { ...pull, requested_reviewers: [] }, "me", null).reviewRequested).toBe(false);
   });
 
   it("reads a repo from its remote, over SSH or HTTPS", () => {

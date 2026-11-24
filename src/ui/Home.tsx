@@ -159,6 +159,27 @@ const saveTicks = (repos: string[]) => {
   }
 };
 
+/** The last list fetched, for the same ticked repos only, kept per browser so a reload draws something at once. */
+const LAST_KEY = "pr-reviewer:last-list";
+const repoKey = (repos: string[]) => [...repos].sort().join(" ");
+const lastList = (repos: string[]): { at: string; inbox: Inbox } | null => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAST_KEY) ?? "null") as { repos?: unknown; at?: unknown } | null;
+    if (saved === null || saved.repos !== repoKey(repos) || typeof saved.at !== "string") return null;
+    const parsed = inboxSchema.safeParse((saved as { inbox?: unknown }).inbox);
+    return parsed.success ? { at: saved.at, inbox: parsed.data } : null;
+  } catch {
+    return null;
+  }
+};
+const saveLastList = (repos: string[], inbox: Inbox) => {
+  try {
+    localStorage.setItem(LAST_KEY, JSON.stringify({ repos: repoKey(repos), at: new Date().toISOString(), inbox }));
+  } catch {
+    // Not kept; the next load waits for GitHub as before.
+  }
+};
+
 function RepoPicker({
   repos,
   ticked,
@@ -272,7 +293,7 @@ function cameFrom(): string | null {
 export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: string[] }) {
   const [found, setFound] = useState<{ here: string | null; repos: string[] } | null>(null);
   const [ticked, setTicked] = useState<string[]>([]);
-  const [inbox, setInbox] = useState<Inbox | null>(null);
+  const [fresh, setFresh] = useState<Inbox | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>({ everything: false, author: null, repo: null, bots: false });
   const [loads, setLoads] = useState(0);
@@ -295,7 +316,7 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
   }, []);
 
   const tick = (repos: string[]) => {
-    setInbox(null);
+    setFresh(null);
     setTicked(repos);
     saveTicks(repos);
   };
@@ -311,7 +332,11 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
         return inboxSchema.parse(JSON.parse(body));
       })
       .then(
-        (data) => current && setInbox(data),
+        (data) => {
+          if (!current) return;
+          setFresh(data);
+          saveLastList(ticked, data);
+        },
         (error: unknown) => current && setFailure(error instanceof Error ? error.message : String(error)),
       );
     return () => {
@@ -319,6 +344,9 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
     };
   }, [found, ticked, loads]);
 
+  // The last list for these repos, shown at once while GitHub is asked again (INBOX-1.1).
+  const last = useMemo(() => (found === null ? null : lastList(ticked)), [found, ticked]);
+  const inbox = fresh ?? last?.inbox ?? null;
   const rows = useMemo(() => (inbox ? rowsOf(inbox, reviews) : []), [inbox, reviews]);
   const shown = filterRows(rows, filters);
   // Offered from the rows the Show choice leaves, so no chip narrows to nothing.
@@ -346,11 +374,12 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
         )}
         <h1>Pull requests</h1>
         {inbox && <span className="home-count">{needsYou > 0 ? `${needsYou} need you` : "nothing needs you"}</span>}
+        {!fresh && last && !failure && <span className="home-count">updating, as of {ago(last.at)}…</span>}
         <button
           className="refresh"
           onClick={() => {
             setFailure(null);
-            setInbox(null);
+            setFresh(null);
             setLoads((count) => count + 1);
           }}
         >
@@ -425,8 +454,8 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
           )}
           {inbox.more > 0 && (
             <p className="home-note">
-              {inbox.more} older open {inbox.more === 1 ? "PR isn't" : "PRs aren't"} listed: GitHub's search returns the
-              newest 100.
+              {inbox.more} older open {inbox.more === 1 ? "PR isn't" : "PRs aren't"} listed: only the newest 100 of a
+              repo are, beside any of yours or asking for your review.
             </p>
           )}
           <p className="home-note">

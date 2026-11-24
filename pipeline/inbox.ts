@@ -28,9 +28,8 @@ const gh = async <Result>(path: string, query: Record<string, string> = {}, trie
 };
 
 /**
- * PRs looked up at once. Each costs up to three `gh` calls (its pull, then its statuses and check runs together), and
- * the reviewed PRs' lookups run beside them with the same limit, so at most about three times this many processes run:
- * bounded, where one per PR at once was a hundred PRs' worth.
+ * Lookups run at once: repos listed, or PRs' checks (two `gh` calls each, statuses and check runs together), so at
+ * most about twice this many processes run: bounded, where one per PR at once was a hundred PRs' worth.
  */
 const CONCURRENT_LOOKUPS = 8;
 
@@ -52,14 +51,19 @@ export async function mapLimited<Item, Result>(
   return results;
 }
 
-interface SearchItem {
+/** An open PR as `repos/{repo}/pulls` lists it: everything a row needs but its checks. */
+export interface ListedPull {
   number: number;
   title: string;
   html_url: string;
   created_at: string;
   draft?: boolean;
   user: { login: string };
-  repository_url: string;
+  head: { sha: string };
+  requested_reviewers?: { login: string }[];
+}
+interface SearchItem {
+  number: number;
 }
 export interface Pull {
   head: { sha: string };
@@ -69,9 +73,6 @@ export interface Pull {
   closed_at: string | null;
 }
 type Checks = OpenPr["checks"];
-
-/** `owner/name` from a search item's `https://api.github.com/repos/owner/name`. */
-const repoOf = (item: SearchItem) => item.repository_url.split("/repos/")[1]!;
 
 /**
  * Commit statuses and check runs at a commit, as one state: any failure fails, then anything unfinished is pending,
@@ -110,45 +111,89 @@ async function checksAt(repo: string, sha: string): Promise<Checks> {
   );
 }
 
+/** A listed pull as a row's PR, with its checks. */
+export const toOpenPr = (repo: string, pull: ListedPull, me: string, checks: Checks): OpenPr => ({
+  repo,
+  number: pull.number,
+  title: pull.title,
+  author: pull.user.login,
+  url: pull.html_url,
+  createdAt: pull.created_at,
+  draft: pull.draft ?? false,
+  head: pull.head.sha,
+  checks,
+  reviewRequested: (pull.requested_reviewers ?? []).some((reviewer) => reviewer.login === me),
+});
+
+/** GitHub's most per page, and so the most open PRs one call lists for a repo. */
+const PAGE = 100;
+
 /**
- * The open PRs in `repos` (this checkout's and the ones nested in it, Alden 2026-11-22: not every repo the reader can
- * see), marking those asking for the reader's review. One search for all of them (repeated `repo:` qualifiers are an
- * OR), one page of 100, newest first; how many more there are is returned, so the page can say so.
+ * One repo's open PRs (INBOX-1.1): one call lists them with their heads and requested reviewers, which a search then a
+ * call per PR took two rounds to give. A repo with more than a page also asks search for how many there are and for
+ * the reader's own past the page (theirs, and those asking for their review), so neither is lost to the cut.
  */
-async function openPrs(me: string, repos: string[]): Promise<{ open: OpenPr[]; more: number }> {
-  if (repos.length === 0) return { open: [], more: 0 };
-  const scope = repos.map((repo) => `repo:${repo}`).join(" ");
+async function repoPulls(repo: string, me: string): Promise<{ pulls: ListedPull[]; more: number }> {
+  const listed = await gh<ListedPull[]>(`repos/${repo}/pulls`, { state: "open", per_page: String(PAGE) });
+  if (listed.length < PAGE) return { pulls: listed, more: 0 };
   const search = (q: string) =>
     gh<{ items: SearchItem[]; total_count: number }>("search/issues", {
-      q: `is:pr is:open ${scope}${q}`,
-      sort: "created",
-      per_page: "100",
+      q: `is:pr is:open repo:${repo}${q}`,
+      per_page: String(PAGE),
     });
-  // A requested review is looked for on its own and listed with the rest, so one past the first page of all PRs is
-  // still listed, with its mark.
-  const [all, requested] = await Promise.all([search(""), search(` review-requested:${me}`)]);
-  const keyOf = (item: SearchItem) => `${repoOf(item)}#${item.number}`;
-  const requestedKeys = new Set(requested.items.map(keyOf));
-  const listed = [...new Map([...all.items, ...requested.items].map((item) => [keyOf(item), item])).values()];
-  const open = await mapLimited(listed, CONCURRENT_LOOKUPS, async (item): Promise<OpenPr> => {
-    const repo = repoOf(item);
-    const pull = await gh<Pull>(`repos/${repo}/pulls/${item.number}`);
-    return {
-      repo,
-      number: item.number,
-      title: item.title,
-      author: item.user.login,
-      url: item.html_url,
-      createdAt: item.created_at,
-      draft: item.draft ?? false,
-      head: pull.head.sha,
-      checks: await checksAt(repo, pull.head.sha),
-      reviewRequested: requestedKeys.has(`${repo}#${item.number}`),
-    };
-  });
-  const extra = listed.length - all.items.length;
-  return { open, more: Math.max(0, all.total_count - all.items.length - extra) };
+  const [all, authored, requested] = await Promise.all([
+    search(""),
+    search(` author:${me}`),
+    search(` review-requested:${me}`),
+  ]);
+  const have = new Set(listed.map((pull) => pull.number));
+  const missing = [...new Set([...authored.items, ...requested.items].map((item) => item.number))].filter(
+    (number) => !have.has(number),
+  );
+  const fetched = await mapLimited(missing, CONCURRENT_LOOKUPS, (number) =>
+    gh<ListedPull>(`repos/${repo}/pulls/${number}`),
+  );
+  return { pulls: [...listed, ...fetched], more: Math.max(0, all.total_count - listed.length - fetched.length) };
 }
+
+/** The open PRs in `repos`, with their checks, and how many a repo had past what was listed. */
+async function openPrs(me: string, repos: string[]): Promise<{ open: OpenPr[]; more: number }> {
+  const perRepo = await mapLimited(repos, CONCURRENT_LOOKUPS, async (repo) => ({
+    repo,
+    ...(await repoPulls(repo, me)),
+  }));
+  const listed = perRepo.flatMap(({ repo, pulls }) => pulls.map((pull) => ({ repo, pull })));
+  const open = await mapLimited(listed, CONCURRENT_LOOKUPS, async ({ repo, pull }) =>
+    toOpenPr(repo, pull, me, await checksAt(repo, pull.head.sha)),
+  );
+  return { open, more: perRepo.reduce((total, each) => total + each.more, 0) };
+}
+
+/** Who `gh` is signed in as, asked once per server: it doesn't change while the server runs. */
+let login: Promise<string> | undefined;
+const whoAmI = (): Promise<string> =>
+  (login ??= gh<{ login: string }>("user").then(
+    (user) => user.login,
+    (error: unknown) => {
+      // A failure (offline, signed out) is asked again next time rather than remembered.
+      login = undefined;
+      throw error;
+    },
+  ));
+
+/**
+ * Merged and closed PRs, remembered for the server's life: they can't reopen into a different past, so a past review's
+ * PR costs one call ever rather than one per page load. An open one is asked each time.
+ */
+const settled = new Map<string, Pull>();
+const pullState = async (key: string): Promise<Pull | null> => {
+  const known = settled.get(key);
+  if (known) return known;
+  const [repo, number] = key.split("#") as [string, string];
+  const pull = await gh<Pull>(`repos/${repo}/pulls/${number}`).catch(() => null);
+  if (pull && pull.state === "closed") settled.set(key, pull);
+  return pull;
+};
 
 const readJson = <Shape>(path: string): Shape => JSON.parse(readFileSync(path, "utf8")) as Shape;
 
@@ -262,19 +307,17 @@ export async function listRepos(clone: string): Promise<{ here: string | null; r
  * `chosen` that the checkout holds are asked about: one it doesn't hold is ignored rather than trusted from a query.
  */
 export async function loadInbox(reviewRoots: string[], clone: string, chosen: string[]): Promise<Inbox> {
-  const [{ login: me }, found] = await Promise.all([gh<{ login: string }>("user"), listRepos(clone)]);
+  const [me, found] = await Promise.all([whoAmI(), listRepos(clone)]);
   const repos = found.repos.filter((repo) => chosen.includes(repo));
   // Past reviews follow the same repos as the open list.
   const folders = reviewFolders(reviewRoots).filter((folder) => repos.includes(folder.repo));
   const keys = [...new Set(folders.map((folder) => `${folder.repo}#${folder.number}`))];
-  const [{ open, more }, pulls] = await Promise.all([
+  // Beside the open list rather than after it, so they add no round: a settled PR costs nothing after its first load.
+  const [{ open, more }, looked] = await Promise.all([
     openPrs(me, repos),
-    mapLimited(keys, CONCURRENT_LOOKUPS, async (key) => {
-      const [repo, number] = key.split("#") as [string, string];
-      return [key, await gh<Pull>(`repos/${repo}/pulls/${number}`).catch(() => null)] as const;
-    }),
+    mapLimited(keys, CONCURRENT_LOOKUPS, async (key) => [key, await pullState(key)] as const),
   ]);
-  return { me, here: found.here, open, more, reviews: joinReviews(folders, new Map(pulls), repos) };
+  return { me, here: found.here, open, more, reviews: joinReviews(folders, new Map(looked), repos) };
 }
 
 /** The PR's head now, and the commits after `reviewed` up to it (GitHub's compare, one call). */
