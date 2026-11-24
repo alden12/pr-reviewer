@@ -7,6 +7,7 @@ import {
   mergeTicks,
   otherReviews,
   inboxSchema,
+  openLabel,
   pastReviews,
   reviewCommand,
   rowsOf,
@@ -110,7 +111,7 @@ function PrRow({ row, me, here }: { row: Row; me: string; here: string | null })
       <div className="pr-actions">
         {review.kind !== "none" && (
           <a className="action primary" href={`?review=${encodeURIComponent(review.name)}`}>
-            Open review
+            {openLabel(review)}
           </a>
         )}
         {(review.kind === "none" || review.kind === "outdated") && <ReviewButton row={row} here={here} />}

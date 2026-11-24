@@ -104,7 +104,13 @@ export function newestFirst(names: string[], reviews: ReviewSummary[]): string[]
 /** Where a PR's review stands, which picks the row's pill and its one action. */
 export type ReviewState =
   | { kind: "none" }
-  | { kind: "running"; name: string; step: string }
+  | {
+      kind: "running";
+      name: string;
+      step: string;
+      /** The run's folder already has a review to open (an earlier round's); a first run has only its step to show. */
+      reviewed: boolean;
+    }
   | { kind: "current"; name: string; verdict: ReviewSummary["verdict"]; decisions: number }
   | {
       kind: "outdated";
@@ -134,7 +140,10 @@ const keyOf = (repo: string, number: number) => `${repo}#${number}`;
 function reviewStateOf(pr: OpenPr, runs: LocalReview[], reviews: ReviewSummary[]): ReviewState {
   const newestFirst = [...runs].sort((left, right) => (right.updatedAt ?? "").localeCompare(left.updatedAt ?? ""));
   const running = newestFirst.find((run) => run.step !== null && run.step !== "done");
-  if (running) return { kind: "running", name: running.name, step: running.step! };
+  if (running) {
+    const reviewed = reviews.some((review) => review.name === running.name);
+    return { kind: "running", name: running.name, step: running.step!, reviewed };
+  }
   const rank = (review: ReviewSummary) => {
     const index = newestFirst.findIndex((run) => run.name === review.name && run.step !== null);
     return index === -1 ? newestFirst.length : index;
@@ -147,6 +156,15 @@ function reviewStateOf(pr: OpenPr, runs: LocalReview[], reviews: ReviewSummary[]
   const fields = { name: review.name, verdict: review.verdict, decisions: review.decisions };
   if (review.commit !== undefined && pr.head.startsWith(review.commit)) return { kind: "current", ...fields };
   return { kind: "outdated", ...fields, canGoBack: rank(review) < newestFirst.length };
+}
+
+/**
+ * The row's link to its review, or null when there is none. A first run still going opens on its step
+ * (`RunInProgress`), so it says so (Alden, 2026-11-24): "Open review" there read as a finished review to look at.
+ */
+export function openLabel(review: ReviewState): string | null {
+  if (review.kind === "none") return null;
+  return review.kind === "running" && !review.reviewed ? "Review running" : "Open review";
 }
 
 /** Every open PR as a row, newest first. */

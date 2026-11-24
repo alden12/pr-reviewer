@@ -21,6 +21,7 @@ import {
   initialTicks,
   mergeTicks,
   newestFirst,
+  openLabel,
   otherReviews,
   pastReviews,
   reviewCommand,
@@ -89,6 +90,20 @@ describe("the home page's rows", () => {
       [2, "current"],
       [1, "none"],
     ]);
+  });
+
+  it("says a first run still going is running, not a review to open, and a later round's has one", () => {
+    // A first run: pr.json and state.json, no review.json yet, so no summary; it opens on the run's step.
+    const [first] = rowsOf(inboxOf([pr(1)], [local("app-1", 1, { step: "review" })]), []);
+    expect(first!.review).toMatchObject({ kind: "running", reviewed: false });
+    expect(openLabel(first!.review)).toBe("Review running");
+    // Sent back for a new head: the earlier round's review.json is still there to open.
+    const [again] = rowsOf(inboxOf([pr(2)], [local("app-2", 2, { step: "fix" })]), [summary("app-2", 2)]);
+    expect(again!.review).toMatchObject({ kind: "running", reviewed: true });
+    expect(openLabel(again!.review)).toBe("Open review");
+    const [current, none] = rowsOf(inboxOf([pr(4), pr(3)]), [summary("app-4", 4, { commit: "head4" })]);
+    expect(openLabel(current!.review)).toBe("Open review");
+    expect(openLabel(none!.review)).toBeNull();
   });
 
   it("counts a review that records no commit as out of date, never as current", () => {
