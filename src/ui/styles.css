@@ -1569,3 +1569,12 @@ tr.comment-row td {
 .repo-picker {
   margin-bottom: 12px;
 }
+
+/* In attraverso's pane (`in-pane`, main.tsx): the plan is beside it, so no link back to it, and less padding in a
+   column a third of the screen wide. */
+.in-pane .home {
+  padding: 12px 12px 32px;
+}
+.in-pane .home-head .back {
+  display: none;
+}

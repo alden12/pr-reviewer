@@ -12,6 +12,17 @@ import { newestFirst, summaryOf, type ReviewSummary } from "./inbox/rows";
 import "./ui/styles.css";
 
 /**
+ * In attraverso's pane (`?in=pane`, the viewer's iframe on a wide screen): every link opens in the whole window, since
+ * a review needs the full width and a PR's page is GitHub's, and the page is marked so its styles fit the pane.
+ */
+if (new URLSearchParams(window.location.search).get("in") === "pane") {
+  const base = document.createElement("base");
+  base.target = "_top";
+  document.head.append(base);
+  document.documentElement.classList.add("in-pane");
+}
+
+/**
  * The committed reviews, bundled in: `reviews/<name>/`, so a review can be read anywhere the repo is, a phone
  * included. What the page reads when there is no server, as when the built file is opened or shared on its own.
  */
