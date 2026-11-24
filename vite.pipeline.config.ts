@@ -59,7 +59,7 @@ export default defineConfig({
       input: {
         run: join(here, "pipeline", "run.ts"),
         serve: join(here, "pipeline", "serve.ts"),
-        // What attraverso's viewer host imports, as `@attraverso/pr-reviewer/host` (DIST-2.2).
+        // What attraverso's viewer host imports, as `@traverso/pr-reviewer/host` (DIST-2.2).
         host: join(here, "pipeline", "viewerExtension.ts"),
       },
       output: { format: "es", entryFileNames: "[name].js" },

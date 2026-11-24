@@ -8,6 +8,7 @@
  * on its row, and a filter narrows to one person or one repo.
  */
 import { z } from "zod";
+import { reviewSchema } from "../review/schema";
 
 /** An open PR as the reviewer's server reports it: REST's fields this page reads, with its checks' combined state. */
 export const openPrSchema = z.strictObject({
@@ -67,6 +68,23 @@ export interface ReviewSummary {
   decisions: number;
   /** When it was put together; absent on reviews made before it was recorded. */
   reviewedAt?: string;
+}
+
+/** What the home page needs of a review, from its `review.json`; undefined when it doesn't parse. */
+export function summaryOf(name: string, annotations: unknown): ReviewSummary | undefined {
+  const parsed = reviewSchema.safeParse(annotations);
+  if (!parsed.success) return undefined;
+  const { pr, verdict, decisions } = parsed.data;
+  return {
+    name,
+    repo: pr.repo,
+    number: pr.number,
+    title: pr.title,
+    verdict,
+    decisions: decisions.length,
+    ...(pr.commit === undefined ? {} : { commit: pr.commit }),
+    ...(pr.reviewedAt === undefined ? {} : { reviewedAt: pr.reviewedAt }),
+  };
 }
 
 /**

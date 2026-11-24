@@ -7,9 +7,12 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openPlan } from "attraverso/library";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { nextLists, planIn, repoRules, runPlans } from "../pipeline/plan.ts";
 import { cloneOf, parsePrRef, runFrom, startTarget } from "../pipeline/target.ts";
+
+// Opening a plan boots PGlite, a second or more on a busy CI runner (master's run after #164 timed out at vitest's 5s).
+vi.setConfig({ testTimeout: 30_000 });
 
 const folders: string[] = [];
 afterEach(() => folders.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true })));

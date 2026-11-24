@@ -1,17 +1,17 @@
 /**
- * The reviewer inside attraverso's viewer (DIST-2.2): what the package exports as `@attraverso/pr-reviewer/host`, for
+ * The reviewer inside attraverso's viewer (DIST-2.2): what the package exports as `@traverso/pr-reviewer/host`, for
  * the viewer's host to find at startup and serve under its own path when the reviewer is installed beside it. Core
  * never imports this package; it tries the import by name and does without it when it isn't there.
  *
  * The contract is core's, structural so neither package imports the other's types: `viewerExtension({ plans })` gives
- * a `prefix`, a `label` for the viewer's tab, and `handle(request)`, a web-standard handler that answers what is
- * under the prefix and returns undefined for anything else. Everything under it is this package's: `host.ts`'s routes
- * at `<prefix>/api/...` (the app asks by relative URL, so they line up) and the built app for every other path.
+ * a `prefix`, a `label` for the viewer's tab, and `handle(request)`, a web-standard handler that answers what is under the prefix and returns undefined for anything
+ * else. Everything under it is this package's: `host.ts`'s routes at `<prefix>/api/...` (the app asks by relative URL,
+ * so they line up), `<prefix>/api/host` saying where the viewer's plan is, and the built app for every other path.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { reviewerHost } from "./host.ts";
-import { PACKAGE, PAGE, reviewsOf } from "./paths.ts";
+import { PACKAGE, PAGE, reviewsFolderOf } from "./paths.ts";
 
 const PREFIX = "/reviews";
 
@@ -24,7 +24,9 @@ export function viewerExtension({ plans }: ViewerExtensionOptions) {
   const plan = plans[0];
   const host = reviewerHost({
     committed: join(PACKAGE, "reviews"),
-    local: plan === undefined ? join(PACKAGE, "reviews.local") : reviewsOf(plan),
+    // Where a run started from this plan writes (`reviewsOf`), named without making it: the viewer starting is no
+    // reason to put a folder and its .gitignore in someone's repo, and the host only reads what is there.
+    local: plan === undefined ? join(PACKAGE, "reviews.local") : reviewsFolderOf(plan),
     clone: plan === undefined ? process.cwd() : dirname(plan),
   });
   const page = (): Response =>
@@ -44,6 +46,8 @@ export function viewerExtension({ plans }: ViewerExtensionOptions) {
       headers: request.headers,
       ...(hasBody ? { body: request.body, duplex: "half" } : {}),
     } as RequestInit);
+    // Where the viewer's plan is, so the PR list links back to it; served on its own the reviewer has no such route.
+    if (inner.pathname === "/api/host") return Response.json({ plan: "/" });
     const answered = await host(stripped);
     if (answered !== undefined) return answered;
     return request.method === "GET" || request.method === "HEAD" ? page() : new Response(null, { status: 405 });

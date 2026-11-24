@@ -6,8 +6,7 @@ import { App } from "./ui/App";
 import type { ReadingEvent } from "./ui/state";
 import { Picker } from "./ui/Picker";
 import { Home } from "./ui/Home";
-import { newestFirst, type ReviewSummary } from "./inbox/rows";
-import { reviewSchema } from "./review/schema";
+import { newestFirst, summaryOf, type ReviewSummary } from "./inbox/rows";
 import "./ui/styles.css";
 
 /**
@@ -47,25 +46,7 @@ const diff = await diffOf();
 const root = createRoot(document.getElementById("root")!);
 /** What the home page needs of each review; one that doesn't parse is left off. */
 const summaries = (): ReviewSummary[] =>
-  library.names.flatMap((name) => {
-    const parsed = reviewSchema.safeParse(library.filesOf(name)?.annotations);
-    if (!parsed.success) return [];
-    const { pr, verdict, decisions } = parsed.data;
-    const commit = pr.commit === undefined ? {} : { commit: pr.commit };
-    const reviewedAt = pr.reviewedAt === undefined ? {} : { reviewedAt: pr.reviewedAt };
-    return [
-      {
-        name,
-        repo: pr.repo,
-        number: pr.number,
-        title: pr.title,
-        verdict,
-        decisions: decisions.length,
-        ...commit,
-        ...reviewedAt,
-      },
-    ];
-  });
+  library.names.flatMap((name) => summaryOf(name, library.filesOf(name)?.annotations) ?? []);
 
 /** The reviews newest first, for the lists of them (`newestFirst`). */
 const ordered = (): string[] => newestFirst(library.names, summaries());

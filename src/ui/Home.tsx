@@ -188,6 +188,28 @@ function PastReviews({ inbox, reviews }: { inbox: Inbox; reviews: ReviewSummary[
   );
 }
 
+const BACK = "reviewer.back";
+
+/**
+ * The viewer page this was opened from, as its tab passes it (`?back=`): its project and its write token, which a bare
+ * `/` would lose. Kept for the tab's session, since opening a review and coming back drops the query; only a path on
+ * this host is taken.
+ */
+function cameFrom(): string | null {
+  const read = (): string | null => {
+    const passed = new URLSearchParams(window.location.search).get("back");
+    try {
+      if (passed !== null) sessionStorage.setItem(BACK, passed);
+      return passed ?? sessionStorage.getItem(BACK);
+    } catch {
+      return passed;
+    }
+  };
+  const back = read();
+  // A path on this host: `//x` and `/\x` would both leave it.
+  return back !== null && /^\/(?![/\\])/.test(back) ? back : null;
+}
+
 /**
  * The reviewer's home page (INBOX-1): every open PR in this repo and the repos nested in it, newest first, with its review's state and
  * the one thing to do next; then the reviews kept here whose PR has merged or closed. The data comes from the
@@ -220,10 +242,25 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
   const shown = filterRows(rows, filters);
   const options = inbox ? filterOptions(rows, inbox.me, filters.bots) : { authors: [], repos: [], bots: 0 };
   const needsYou = rows.filter((row) => row.needsYou).length;
+  // Inside attraverso's viewer the host says where its plan is (`api/host`); served on its own, there is none.
+  const [plan, setPlan] = useState<string | null>(null);
+  useEffect(() => {
+    fetch("api/host")
+      .then((response): Promise<{ plan?: unknown }> | { plan?: unknown } => (response.ok ? response.json() : {}))
+      .then(
+        (host) => setPlan(typeof host.plan === "string" ? (cameFrom() ?? host.plan) : null),
+        () => setPlan(null),
+      );
+  }, []);
 
   return (
     <main className="home">
       <header className="home-head">
+        {plan !== null && (
+          <a className="back" href={plan}>
+            ← Plan
+          </a>
+        )}
         <h1>Pull requests</h1>
         {inbox && <span className="home-count">{needsYou > 0 ? `${needsYou} need you` : "nothing needs you"}</span>}
         <button

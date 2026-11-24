@@ -38,9 +38,12 @@ export const BUILT_GRAMMARS = join(PACKAGE, "dist", "grammars");
 const IGNORED =
   "# Written by pr-reviewer: a review's working files stay out, what the app reads is committed.\n*/*\n!*/diff.json\n!*/review.json\n";
 
+/** Where the reviews of runs started from `plan`'s folder go, made or not: for a reader, which makes nothing. */
+export const reviewsFolderOf = (plan: string): string => join(dirname(plan), ".attraverso", "reviews");
+
 /** The reviews of runs started from `plan`'s folder, made with its `.gitignore` the first time. */
 export function reviewsOf(plan: string): string {
-  const folder = join(dirname(plan), ".attraverso", "reviews");
+  const folder = reviewsFolderOf(plan);
   if (!existsSync(join(folder, ".gitignore"))) {
     mkdirSync(folder, { recursive: true });
     writeFileSync(join(folder, ".gitignore"), IGNORED);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -19,6 +19,7 @@ import {
   pastReviews,
   reviewCommand,
   rowsOf,
+  summaryOf,
   type Inbox,
   type OpenPr,
   type ReviewSummary,
@@ -302,5 +303,16 @@ describe("other reviews", () => {
       "app-1-older",
       "other-repo-9",
     ]);
+  });
+});
+
+describe("a review's summary", () => {
+  it("is read from its review.json, as the app takes it", () => {
+    const annotations = JSON.parse(readFileSync(join(import.meta.dirname, "fixtures/example/review.json"), "utf8"));
+    const read = summaryOf("example-1", annotations);
+    expect(read?.name).toBe("example-1");
+    expect(read?.number).toBe(annotations.pr.number);
+    expect(read?.verdict).toBe(annotations.verdict);
+    expect(summaryOf("broken-1", { not: "a review" })).toBeUndefined();
   });
 });
