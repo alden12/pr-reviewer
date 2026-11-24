@@ -53,11 +53,14 @@ export function App({
   review,
   record,
   home,
+  homeHref,
 }: {
   review: Review;
   record?: (event: ReadingEvent) => void;
   /** What the back link in the toolbar goes to; absent when there is nowhere to go back to. */
   home?: string;
+  /** Where that link goes, when it is not this app's home page (a review opened from attraverso's pane). */
+  homeHref?: string;
 }) {
   const reducer = useMemo(() => makeReducer(review), [review]);
   // Files marked viewed come back on a reload (and after a rebuild, unless their diff changed), each folded away.
@@ -129,7 +132,7 @@ export function App({
     <ReviewContext.Provider value={{ review, state, dispatch, names }}>
       <div className="page" onClick={onClick} onKeyDown={onKeyDown}>
         <PrHeader />
-        <Toolbar {...(home ? { home } : {})} />
+        <Toolbar {...(home ? { home } : {})} {...(homeHref ? { homeHref } : {})} />
         <div className="layout">
           <FileTree current={current} />
           <div className="files">

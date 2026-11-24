@@ -24,7 +24,7 @@ function LeftToRead() {
  * View switches and progress, pinned to the top as the reader scrolls: the defaults suit a first read, and each can
  * be turned off.
  */
-export function Toolbar({ home }: { home?: string }) {
+export function Toolbar({ home, homeHref }: { home?: string; homeHref?: string }) {
   const { review, state, dispatch } = useReview();
   const folded = Object.values(review.annotations.blocks)
     .flat()
@@ -47,7 +47,7 @@ export function Toolbar({ home }: { home?: string }) {
     <div className="toolbar" ref={bar}>
       {home && (
         // The page with no review named: the open PRs in the dev server, the list of reviews in a build of several.
-        <a className="back" href={globalThis.location?.pathname ?? "./"}>
+        <a className="back" href={homeHref ?? globalThis.location?.pathname ?? "./"}>
           ← {home}
         </a>
       )}

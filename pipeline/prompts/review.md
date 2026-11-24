@@ -18,7 +18,9 @@ You did not write this PR. Assume it is wrong somewhere and go looking. Report; 
 1. **Correctness and omissions.** Bugs, wrong edge cases (empty, zero, one, the largest, a reload mid-way, a
    message arriving late), races, resources not freed, state that can go stale. Comments and docs that say what
    the code doesn't do. What the PR or its items claim that isn't there.
-2. **The repo's conventions**, everything its `CLAUDE.md` asks. Code written unlike its neighbours.
+2. **The repo's conventions**, everything its `CLAUDE.md` asks. Code written unlike its neighbours. A magic number
+   (a bare `700`, `30_000` or `3` whose meaning isn't on the line, and above all one written in more than one
+   place) wants a named constant, and a value CSS has to repeat wants a comment at each end tying the two together.
 3. **Duplication.** Search the whole repo for a helper, type or pattern that already does what new code does
    again. Name the existing thing.
 4. **Complexity.** A simpler design for the same job; options nothing needs yet; dead code; indirection that hides.

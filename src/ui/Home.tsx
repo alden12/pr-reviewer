@@ -20,6 +20,7 @@ import { useRun, type RunState } from "./useRun";
 import { VERDICT_LABEL } from "./context";
 import { ReviewLinks } from "./Picker";
 import { useCopy } from "./useCopy";
+import { cameFrom, reviewHref } from "./pane";
 
 /** A date as the list reads it: "today", "3 days ago", then the date itself past a fortnight. */
 const ago = (iso: string, now = Date.now()) => {
@@ -138,7 +139,7 @@ function PrRow({ row, me, here, listed }: { row: Row; me: string; here: string |
           </button>
         )}
         {review.kind !== "none" && openLabel(review, live) === "Open review" && (
-          <a className="action primary" href={`?review=${encodeURIComponent(review.name)}`}>
+          <a className="action primary" href={reviewHref(review.name)}>
             Open review
           </a>
         )}
@@ -274,7 +275,7 @@ function PastReviews({ inbox, reviews }: { inbox: Inbox; reviews: ReviewSummary[
       <ul>
         {past.map((review) => (
           <li key={review.name}>
-            <a href={`?review=${encodeURIComponent(review.name)}`}>
+            <a href={reviewHref(review.name)}>
               <span className="pr-ref">
                 {review.repo} #{review.number}
               </span>{" "}
@@ -293,28 +294,6 @@ function PastReviews({ inbox, reviews }: { inbox: Inbox; reviews: ReviewSummary[
       </ul>
     </details>
   );
-}
-
-const BACK = "reviewer.back";
-
-/**
- * The viewer page this was opened from, as its tab passes it (`?back=`): its project and its write token, which a bare
- * `/` would lose. Kept for the tab's session, since opening a review and coming back drops the query; only a path on
- * this host is taken.
- */
-function cameFrom(): string | null {
-  const read = (): string | null => {
-    const passed = new URLSearchParams(window.location.search).get("back");
-    try {
-      if (passed !== null) sessionStorage.setItem(BACK, passed);
-      return passed ?? sessionStorage.getItem(BACK);
-    } catch {
-      return passed;
-    }
-  };
-  const back = read();
-  // A path on this host: `//x` and `/\x` would both leave it.
-  return back !== null && /^\/(?![/\\])/.test(back) ? back : null;
 }
 
 /**

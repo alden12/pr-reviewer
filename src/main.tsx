@@ -9,13 +9,14 @@ import { Home } from "./ui/Home";
 import { RunInProgress, type RunState } from "./ui/RunInProgress";
 import { clearReopened } from "./ui/useRun";
 import { newestFirst, summaryOf, type ReviewSummary } from "./inbox/rows";
+import { inPane, paneBack } from "./ui/pane";
 import "./ui/styles.css";
 
 /**
  * In attraverso's pane (`?in=pane`, the viewer's iframe on a wide screen): every link opens in the whole window, since
  * a review needs the full width and a PR's page is GitHub's, and the page is marked so its styles fit the pane.
  */
-if (new URLSearchParams(window.location.search).get("in") === "pane") {
+if (inPane()) {
   const base = document.createElement("base");
   base.target = "_top";
   document.head.append(base);
@@ -118,9 +119,16 @@ if (running !== null && requested !== null) {
   document.title = `#${review.annotations.pr.number} ${review.annotations.pr.title}`;
   // Back to the open PRs when served; without a server, to the list of reviews, which only exists with more than one.
   const home = served ? "Pull requests" : library.names.length > 1 ? "Reviews" : undefined;
+  // Opened from attraverso's pane, back to the viewer with the pane open, where the pull requests were.
+  const homeHref = served ? paneBack() : null;
   root.render(
     <StrictMode>
-      <App review={review} {...(record ? { record } : {})} {...(home ? { home } : {})} />
+      <App
+        review={review}
+        {...(record ? { record } : {})}
+        {...(home ? { home } : {})}
+        {...(homeHref ? { homeHref } : {})}
+      />
     </StrictMode>,
   );
 }

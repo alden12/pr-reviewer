@@ -1448,16 +1448,30 @@ tr.comment-row td {
   background: var(--sunk);
   color: var(--muted);
 }
+/* Narrow, the title and pills take the row's width and the actions sit at its top right, beside who and when, rather
+   than wrapping to the bottom where a long title pushed them. attraverso's pane (`in-pane`) is narrow at any width
+   it is dragged to: a third of a wide screen is past this breakpoint, but a column beside the plan all the same. */
 @media (max-width: 560px) {
-  .pr-row {
-    grid-template-columns: 1fr;
+  .pr-title,
+  .pr-pills {
+    grid-column: 1 / -1;
   }
   .pr-actions {
-    grid-column: 1;
-    grid-row: auto;
+    grid-row: 1;
     flex-direction: row;
-    justify-content: flex-start;
+    align-items: center;
+    align-self: start;
   }
+}
+.in-pane .pr-title,
+.in-pane .pr-pills {
+  grid-column: 1 / -1;
+}
+.in-pane .pr-actions {
+  grid-row: 1;
+  flex-direction: row;
+  align-items: center;
+  align-self: start;
 }
 
 /* Past reviews, and every review here: closed until opened. */
