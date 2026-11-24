@@ -97,6 +97,9 @@ describe("the home page's rows", () => {
     const [first] = rowsOf(inboxOf([pr(1)], [local("app-1", 1, { step: "review" })]), []);
     expect(first!.review).toMatchObject({ kind: "running", reviewed: false });
     expect(openLabel(first!.review)).toBe("Review running");
+    // Polled since the list loaded, the run has written its review: there is one to open now.
+    expect(openLabel(first!.review, { written: false })).toBe("Review running");
+    expect(openLabel(first!.review, { written: true })).toBe("Open review");
     // Sent back for a new head: the earlier round's review.json is still there to open.
     const [again] = rowsOf(inboxOf([pr(2)], [local("app-2", 2, { step: "fix" })]), [summary("app-2", 2)]);
     expect(again!.review).toMatchObject({ kind: "running", reviewed: true });

@@ -6,6 +6,8 @@ import { App } from "./ui/App";
 import type { ReadingEvent } from "./ui/state";
 import { Picker } from "./ui/Picker";
 import { Home } from "./ui/Home";
+import { RunInProgress, type RunState } from "./ui/RunInProgress";
+import { clearReopened } from "./ui/useRun";
 import { newestFirst, summaryOf, type ReviewSummary } from "./inbox/rows";
 import "./ui/styles.css";
 
@@ -34,7 +36,10 @@ const ask = async (path: string): Promise<unknown> => {
 const fromServer = await ask("api/reviews");
 const { served, files: source } = sourceOf(fromServer, bundled);
 const library = reviewLibrary(source);
-const chosen = library.choose(new URLSearchParams(window.location.search).get("review"));
+const requested = new URLSearchParams(window.location.search).get("review");
+const chosen = library.choose(requested);
+// The review opens, so a reload the in-progress page made for it (`onOpen`) is spent: the next one gets its own.
+if (chosen !== null) clearReopened(chosen);
 const files = chosen === null ? null : library.filesOf(chosen);
 /** The chosen review's diff: asked for when served (the list carries no diffs, they are the bulk), else bundled. */
 const diffOf = async (): Promise<unknown> => {
@@ -42,6 +47,12 @@ const diffOf = async (): Promise<unknown> => {
   return served ? ask(`api/diff/${encodeURIComponent(chosen)}`) : files.diff;
 };
 const diff = await diffOf();
+
+/** A run asked for by name that has no review yet: where it is, from the server (`api/run`). */
+const running =
+  served && requested !== null && chosen === null
+    ? ((await ask(`api/run/${encodeURIComponent(requested)}`)) as RunState | null)
+    : null;
 
 const root = createRoot(document.getElementById("root")!);
 /** What the home page needs of each review; one that doesn't parse is left off. */
@@ -51,7 +62,14 @@ const summaries = (): ReviewSummary[] =>
 /** The reviews newest first, for the lists of them (`newestFirst`). */
 const ordered = (): string[] => newestFirst(library.names, summaries());
 
-if (chosen !== null && files !== null && diff === null) {
+if (running !== null && requested !== null) {
+  document.title = `${running.number === undefined ? requested : `#${running.number}`}: review in progress`;
+  root.render(
+    <StrictMode>
+      <RunInProgress name={requested} run={running} />
+    </StrictMode>,
+  );
+} else if (chosen !== null && files !== null && diff === null) {
   // The review is listed but its diff didn't come (gone since, or unreadable): say so, rather than showing the list as
   // though the link were wrong.
   document.title = "Review not loaded";

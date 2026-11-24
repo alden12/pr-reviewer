@@ -16,6 +16,9 @@ heading can't lean on the one above it, on the code below it, or on a comment th
   its kind with it: "`pr-reviewer start` chooses which local copy of the repo to read the PR from when there are
   several (the main checkout and its git worktrees)", not "start picks the right checkout when a repo has a clone and
   worktrees".
+- **When code moves or splits, say why, not where it went.** The new function's name is the least useful part: "The
+  checks `done` runs on a step's files move into their own function, so `check` can run them without moving the run
+  on", not "Checking a step's files moves into problemsWith too, starting with each file against its schema".
 - **Don't copy the code's comments.** They are written for someone reading the code around them; say the point again
   in your own words.
 - Longer and clear beats short and cryptic.

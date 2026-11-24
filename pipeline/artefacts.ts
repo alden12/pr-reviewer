@@ -7,7 +7,7 @@
  * working files below, ignored by git, beside the `diff.json` and `review.json` the app reads, which are committed.
  */
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { isRef } from "attraverso/library";
@@ -179,8 +179,15 @@ export function workspace(dir: string) {
       throw new Error(`${ARTEFACTS[name].file} does not fit its schema: ${z.prettifyError(result.error)}`);
     return result.data as Artefact<Name>;
   };
-  const write = <Name extends ArtefactName>(name: Name, value: Artefact<Name>): void =>
-    writeFileSync(pathOf(name), `${JSON.stringify(value, null, name === "diff" ? undefined : 2)}\n`);
+  /**
+   * Written whole or not at all (a temporary file, then a rename): the app's server reads these while a run writes
+   * them, and a half-written `review.json` would be a review that exists on disk and won't load.
+   */
+  const write = <Name extends ArtefactName>(name: Name, value: Artefact<Name>): void => {
+    const temporary = `${pathOf(name)}.${process.pid}.tmp`;
+    writeFileSync(temporary, `${JSON.stringify(value, null, name === "diff" ? undefined : 2)}\n`);
+    renameSync(temporary, pathOf(name));
+  };
   return { dir, pathOf, has, read, write };
 }
 export type Workspace = ReturnType<typeof workspace>;

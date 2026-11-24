@@ -16,6 +16,7 @@ import {
   type ReviewSummary,
   type Row,
 } from "../inbox/rows";
+import { useRun, type RunState } from "./useRun";
 import { VERDICT_LABEL } from "./context";
 import { ReviewLinks } from "./Picker";
 import { useCopy } from "./useCopy";
@@ -49,10 +50,20 @@ const emptyNotice = (rows: Row[], offered: Row[], bots: number, filters: Filters
   return "None match these filters.";
 };
 
-/** The review's pill: where it stands, and what it came to. */
-function ReviewPill({ review }: { review: Row["review"] }) {
+/**
+ * The review's pill: where it stands, and what it came to. A running review's step is `live` (`useRun`), with a
+ * spinner until the run is done; then it says so, and the list's next refresh shows its verdict.
+ */
+function ReviewPill({ review, live }: { review: Row["review"]; live: RunState | null }) {
   if (review.kind === "none") return <span className="pill none">not reviewed</span>;
-  if (review.kind === "running") return <span className="pill run">reviewing: {review.step}</span>;
+  if (review.kind === "running") {
+    if (live?.at === "done") return <span className="pill ok">review finished</span>;
+    return (
+      <span className="pill run">
+        <span className="spinner" aria-hidden="true" /> reviewing: {live?.at ?? review.step}
+      </span>
+    );
+  }
   return review.kind === "current" ? (
     <span className="pill ok">reviewed: {VERDICT_LABEL[review.verdict]}</span>
   ) : (
@@ -77,8 +88,18 @@ function ReviewButton({ row, here }: { row: Row; here: string | null }) {
   );
 }
 
-function PrRow({ row, me, here }: { row: Row; me: string; here: string | null }) {
+function PrRow({ row, me, here, listed }: { row: Row; me: string; here: string | null; listed: number }) {
   const { pr, review } = row;
+  // A run still going is asked about until it is done, on the local server only: its step and spinner stay current,
+  // and the row says when it finishes, without opening anything or asking GitHub again.
+  const running = review.kind === "running";
+  const live = useRun(
+    running ? review.name : "",
+    running ? { at: review.step, waiting: true, written: review.reviewed } : null,
+    running,
+    // Each list GitHub answers is newer than what the row polled before it, so it starts the row's run again.
+    String(listed),
+  );
   const decisions = "decisions" in review ? review.decisions : 0;
   return (
     <li className={`pr-row${row.needsYou ? " needs-you" : ""}`}>
@@ -100,7 +121,7 @@ function PrRow({ row, me, here }: { row: Row; me: string; here: string | null })
       </a>
       <div className="pr-pills">
         {pr.checks && <span className={`pill ${CHECKS[pr.checks].tone}`}>{CHECKS[pr.checks].label}</span>}
-        <ReviewPill review={review} />
+        <ReviewPill review={review} live={live} />
         {pr.reviewRequested && <span className="pill warn">your review requested</span>}
         {row.mine && decisions > 0 && (
           <span className="pill warn">
@@ -109,9 +130,16 @@ function PrRow({ row, me, here }: { row: Row; me: string; here: string | null })
         )}
       </div>
       <div className="pr-actions">
-        {review.kind !== "none" && (
+        {/* A run with no review yet has nothing to open: the pill already shows its step, live, so the button only
+            says so (Alden, 2026-11-24: a link there led somewhere that made no sense). */}
+        {review.kind !== "none" && openLabel(review, live) === "Review running" && (
+          <button className="action primary" disabled title="The review opens here once it is written">
+            Review running
+          </button>
+        )}
+        {review.kind !== "none" && openLabel(review, live) === "Open review" && (
           <a className="action primary" href={`?review=${encodeURIComponent(review.name)}`}>
-            {openLabel(review)}
+            Open review
           </a>
         )}
         {(review.kind === "none" || review.kind === "outdated") && <ReviewButton row={row} here={here} />}
@@ -299,6 +327,8 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
   const [found, setFound] = useState<{ here: string | null; repos: string[] } | null>(null);
   const [ticked, setTicked] = useState<string[]>([]);
   const [fresh, setFresh] = useState<Inbox | null>(null);
+  // How many lists have come, so a row's live run starts again from each (`useRun`'s `since`).
+  const [listed, setListed] = useState(0);
   const [failure, setFailure] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>({ everything: false, author: null, repo: null, bots: false });
   const [loads, setLoads] = useState(0);
@@ -355,6 +385,7 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
         (data) => {
           if (!current) return;
           setFresh(data);
+          setListed((count) => count + 1);
           setRefreshing(false);
           saveLastList(ticked, data);
         },
@@ -476,7 +507,13 @@ export function Home({ reviews, names }: { reviews: ReviewSummary[]; names: stri
           ) : (
             <ul className="pr-list">
               {shown.map((row) => (
-                <PrRow key={`${row.pr.repo}#${row.pr.number}`} row={row} me={inbox.me} here={inbox.here} />
+                <PrRow
+                  key={`${row.pr.repo}#${row.pr.number}`}
+                  row={row}
+                  me={inbox.me}
+                  here={inbox.here}
+                  listed={listed}
+                />
               ))}
             </ul>
           )}

@@ -1294,6 +1294,13 @@ tr.comment-row td {
   border-color: var(--accent);
   color: #fff;
 }
+/* "Review running": nothing to open yet, so it reads as waiting rather than as a button to press. */
+.home .action:disabled {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: default;
+}
 .home-failure {
   padding: 12px 14px;
   border-radius: 8px;
@@ -1516,6 +1523,46 @@ tr.comment-row td {
 }
 .since-review a {
   color: inherit;
+}
+
+/* A review whose run is still going (RunInProgress.tsx): a short page, read at a glance. */
+.run-in-progress {
+  max-width: 40rem;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  line-height: 1.5;
+}
+.run-in-progress h1 {
+  font-size: 1.25rem;
+}
+.run-in-progress .run-command {
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+/* A run still going (useRun): a small spinner beside its step, in the row's pill and on its page. */
+.spinner {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-right: 0.3em;
+  vertical-align: -0.1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    border-right-color: currentColor;
+    opacity: 0.6;
+  }
 }
 
 /* The repos to list: a tick is what lets GitHub be asked about one. */

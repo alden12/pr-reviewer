@@ -75,6 +75,27 @@ export function reviewerHost({ committed, local, clone }: ReviewerHostOptions): 
     return data === undefined ? status(404) : json(data);
   };
 
+  /**
+   * Where a run is, for a review that has no `review.json` yet (written at assemble, after narrate): its step, whether
+   * an agent has it, and the PR, from the run's `state.json` and `pr.json`. Read loosely rather than through
+   * `state.ts`, which brings the whole pipeline with it; a field missing reads as unknown, never as an error.
+   */
+  const run = (name: string): Response => {
+    const dir = join(local, name);
+    const state = readJson(join(dir, "state.json")) as { at?: unknown; waiting?: unknown } | undefined;
+    if (state === undefined || typeof state.at !== "string") return status(404);
+    const pr = readJson(join(dir, "pr.json")) as { number?: unknown; title?: unknown; repo?: unknown } | undefined;
+    return json({
+      at: state.at,
+      waiting: state.waiting === true,
+      // Whether the app has a review to open yet: written at assemble, before the run's last steps.
+      written: existsSync(join(dir, "review.json")),
+      ...(typeof pr?.number === "number" ? { number: pr.number } : {}),
+      ...(typeof pr?.title === "string" ? { title: pr.title } : {}),
+      ...(typeof pr?.repo === "string" ? { repo: pr.repo } : {}),
+    });
+  };
+
   /** `owner/name` as GitHub has them: a login is letters, digits and hyphens; a name may hold dots, but isn't `.` or `..`. */
   const isRepo = (repo: string): boolean => {
     const [owner, name, ...rest] = repo.split("/");
@@ -124,6 +145,7 @@ export function reviewerHost({ committed, local, clone }: ReviewerHostOptions): 
     const routes: Record<string, () => Promise<Response> | Response> = {
       reviews: () => (get ? reviews() : status(405)),
       diff: () => (get && isReviewName(name) ? diff(name) : status(404)),
+      run: () => (get && isReviewName(name) ? run(name) : status(404)),
       repos: () => (get ? listRepos(clone).then(json, failed) : status(405)),
       inbox: () => (get ? inbox(url.searchParams) : status(405)),
       since: () => (get ? since(url.searchParams) : status(405)),

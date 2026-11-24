@@ -159,12 +159,15 @@ function reviewStateOf(pr: OpenPr, runs: LocalReview[], reviews: ReviewSummary[]
 }
 
 /**
- * The row's link to its review, or null when there is none. A first run still going opens on its step
- * (`RunInProgress`), so it says so (Alden, 2026-11-24): "Open review" there read as a finished review to look at.
+ * The row's action on its review, or null when there is none: "Open review", or for a first run still going, which
+ * has nothing to open yet, "Review running", drawn as a disabled button (Alden, 2026-11-24: "Open review" there read
+ * as a finished review to look at, and a link to a page with only the step on it led nowhere useful).
  */
-export function openLabel(review: ReviewState): string | null {
+export function openLabel(review: ReviewState, live: { written?: boolean } | null = null): string | null {
   if (review.kind === "none") return null;
-  return review.kind === "running" && !review.reviewed ? "Review running" : "Open review";
+  // Live, the run has written its review since the list loaded: there is one to open now.
+  const reviewed = review.kind === "running" && (review.reviewed || live?.written === true);
+  return review.kind === "running" && !reviewed ? "Review running" : "Open review";
 }
 
 /** Every open PR as a row, newest first. */

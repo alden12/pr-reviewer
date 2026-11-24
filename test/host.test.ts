@@ -31,6 +31,12 @@ beforeAll(async () => {
   write("reviews.local/a-1/diff.json", [{ which: "local a's diff" }]);
   // A folder with no review.json (a run still at its first agent step) isn't a review yet.
   write("reviews.local/c-3/state.json", {});
+  // One waiting on its narrate step, its PR fetched.
+  write("reviews.local/d-4/state.json", { at: "narrate", waiting: true, history: [] });
+  write("reviews.local/d-4/pr.json", { number: 4, title: "Make it so", repo: "acme/web" });
+  // One past assemble whose review.json doesn't parse: on disk, so `written`, but the review list can't carry it.
+  write("reviews.local/e-5/state.json", { at: "proofread", waiting: true, history: [] });
+  write("reviews.local/e-5/review.json", "{ not json");
   write("page.html", "<!doctype html><title>the app</title>");
   const server = createReviewerServer(
     { committed: join(dir, "reviews"), local: join(dir, "reviews.local"), clone: dir },
@@ -56,6 +62,27 @@ const event = JSON.stringify({
 });
 
 describe("the reviewer's server", () => {
+  it("says where a run with no review yet is, and nothing for one with no state or a bad name", async () => {
+    const run = await fetch(`${base}/api/run/d-4`);
+    expect(await run.json()).toEqual({
+      at: "narrate",
+      waiting: true,
+      written: false,
+      number: 4,
+      title: "Make it so",
+      repo: "acme/web",
+    });
+    // `written` is the file being there, which the page reloads on only when it saw it turn so (`reloadsOnto`).
+    expect(await (await fetch(`${base}/api/run/e-5`)).json()).toEqual({
+      at: "proofread",
+      waiting: true,
+      written: true,
+    });
+    expect((await fetch(`${base}/api/run/c-3`)).status).toBe(404);
+    expect((await fetch(`${base}/api/run/nope-9`)).status).toBe(404);
+    expect((await fetch(`${base}/api/run/..%2Fx`)).status).toBe(404);
+  });
+
   it("lists every review.json, keyed as the bundled glob keys them, and no folder without one", async () => {
     const listed = (await (await fetch(`${base}/api/reviews`)).json()) as Record<string, unknown>;
     expect(listed).toEqual({
