@@ -15,13 +15,16 @@ or section, the defaults: nothing assumed beyond this prompt) and the reviewed r
 1. **Every heading earns its place, and matches what is under it.** A heading naming something that is folded away
    below it, or a section heading over code it doesn't describe, is wrong. So is a heading that repeats the code,
    one that only breaks up lines without saying what its part does, and a long stretch under one heading that would
-   read clearer as two short steps (about 10 lines each is the aim).
+   read clearer as two short steps (about 10 lines each is the aim). And a heading has to make sense read cold: one
+   that points at things instead of naming them ("those", "neither", "the page"), packs the code's nouns into a
+   phrase, or echoes a code comment, so that it takes a second read to grok, goes back to narrate with a plainer
+   wording.
 2. **Like is treated alike.** Two type declarations, one shown and one folded; two near-identical functions, both in
    full; a summary that says less than its neighbour's. Inconsistency is the reader's first sign the review can't be
    trusted.
 3. **What shows is worth reading.** Code that shows in full but reads as boilerplate, repetition, plumbing or data
    should be a span with a summary; say what span, and what its summary should say.
-4. **What folds is safe to fold.** A fold that hides the point of a file (the change itself, a type that *is* the
+4. **What folds is safe to fold.** A fold that hides the point of a file (the change itself, a type that _is_ the
    change, the step list of a pipeline) should show.
 5. **Summaries tell the reader whether to open them.** `[…object] const x = { a, b and 4 more }` is a list of keys;
    a good summary says what the thing is for.
@@ -34,7 +37,11 @@ or section, the defaults: nothing assumed beyond this prompt) and the reviewed r
 ```json
 {
   "issues": [
-    { "where": "pipeline/pipeline.ts, section \"Each agent step's own checks\"", "problem": "what is wrong, and what it should be instead", "back": "judge" }
+    {
+      "where": "pipeline/pipeline.ts, section \"Each agent step's own checks\"",
+      "problem": "what is wrong, and what it should be instead",
+      "back": "judge"
+    }
   ]
 }
 ```

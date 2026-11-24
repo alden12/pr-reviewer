@@ -4,6 +4,18 @@ The reader should get what the PR is for and how it flows without reading every 
 of it. Write for someone who knows the repo but not this change. Plain words, short; the repo's writing style
 (its `CLAUDE.md`) applies.
 
+**Every heading makes sense on its own**, read cold by someone whose eye just landed on it. The reader skims, so a
+heading can't lean on the one above it, on the code below it, or on a comment the view hides:
+
+- **Name the things, don't point at them.** No "those", "it", "neither" or "the page" standing for something said
+  elsewhere: "Your PRs past the first 100 are added, and the rest counted", not "The page plus those, and how many
+  open PRs neither holds".
+- **Say what it does for the reader, in a whole thought**, not a compressed list of the code's nouns. If it takes a
+  second read to work out what a heading means, rewrite it.
+- **Don't copy the code's comments.** They are written for someone reading the code around them; say the point again
+  in your own words.
+- Longer and clear beats short and cryptic.
+
 ## Read
 
 `pr.json`, `diff.json`, `findings.json`, `outcomes.json` (if there is one) and `folds.json`, plus the items the PR
