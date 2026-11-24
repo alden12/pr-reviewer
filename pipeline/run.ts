@@ -8,6 +8,7 @@
  * checkouts under the folder the run is started in (`target.ts`), so a run from a folder above several repos reviews
  * the right one. It is started through bin/pr-reviewer, in the folder holding the plan (`plan.ts`), which supplies the
  * rules and Next lists; the reviewed checkout's own plan, if it has one, isn't read.
+ *   npx @traverso/pr-reviewer check <name>             check the agent step's files, without moving on (read-only)
  *   npx @traverso/pr-reviewer done <name>              the agent step's files are written: check them, carry on
  *   npx @traverso/pr-reviewer status <name>
  *   npx @traverso/pr-reviewer back <name> <step>       go back to a step by hand
@@ -17,28 +18,38 @@
  * library in; the package runs its build (`dist/pipeline/run.js`) on plain Node.
  */
 import { execFileSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { parseArgs } from "node:util";
 import { ARTEFACTS, workspace } from "./artefacts.ts";
 import { pipeline, STEP_IDS, type StepId } from "./pipeline.ts";
 import { commitsSinceReview, reReviewRounds } from "./loops.ts";
-import { advance, finish, type AgentDriver, type Runner } from "./runner.ts";
-import { BIN, PROMPTS, reviewsOf } from "./paths.ts";
+import { advance, check, finish, type AgentDriver, type Runner } from "./runner.ts";
+import { BIN, PACKAGE, PROMPTS, RUNS_BUILT, reviewsOf } from "./paths.ts";
 import { planIn } from "./plan.ts";
 import { runFrom, startTarget } from "./target.ts";
 import { DONE, hasState, loadState, logged, proofreadSendBacks, saveState, type ReviewState } from "./state.ts";
 
-// The package's command by its full path (`paths.ts`), which runs from any folder: `yarn workspace` needs this
-// monorepo, and a run at work starts in the folder above the company's repos, where there is none.
-const command = (args: string[]) => `${BIN} ${args.join(" ")}`;
+/**
+ * The command a hand-over prints for the next move. Installed, it is the package by name and exact version, which runs
+ * from any folder and lasts: the path a run's own copy has (`~/.npm/_npx/<hash>/...`) is a cache entry that differs per
+ * install, so the MCP server's copy and the session's had different ones. From source it is `bin/pr-reviewer` by its
+ * full path, since `yarn workspace` needs this monorepo and a run can start in a folder above it.
+ */
+const version = (JSON.parse(readFileSync(`${PACKAGE}/package.json`, "utf8")) as { version: string }).version;
+const command = (args: string[]) => `${RUNS_BUILT ? `npx -y @traverso/pr-reviewer@${version}` : BIN} ${args.join(" ")}`;
 
-/** Prints what the agent step needs, for the session driving the run to do. */
+/**
+ * Prints what the agent step needs, for the session driving the run to do. Every agent step goes to a new agent, which
+ * writes the step's files and may `check` them; the session runs `done`. One actor writing a step's output and then
+ * moving the pipeline on looks like signing off its own work, which Claude Code's auto mode blocks (it did, on a judge
+ * step at work), so the hand-over says who does which.
+ */
 const localDriver = (name: string): AgentDriver => ({
   handOver(id, step, context, problems, brief) {
     const files = (names: (keyof typeof ARTEFACTS)[]) => names.map((artefact) => ARTEFACTS[artefact].file).join(", ");
     const lines = [
-      `-> ${id}: ${step.does} (agent${step.fresh ? ", fresh: a new agent that did not write the PR" : ""})`,
+      `-> ${id}: ${step.does} (agent${step.fresh ? ", fresh: a new agent that did not write the PR" : ", a new agent"})`,
       `   prompt:  ${join(PROMPTS, step.prompt)}`,
       `   folder:  ${context.work.dir}`,
       `   clone:   ${context.clone}`,
@@ -46,7 +57,8 @@ const localDriver = (name: string): AgentDriver => ({
       `   writes:  ${files(step.writes)}`,
       ...brief.map((line) => `   ${line}`),
       ...(problems.length > 0 ? ["   sent back to put right:", ...problems.map((problem) => `     - ${problem}`)] : []),
-      `   then:    ${command(["done", name])}`,
+      `   check:   ${command(["check", name])}   # read-only, for the agent that writes the files`,
+      `   then:    the session driving the run, not that agent, runs: ${command(["done", name])}`,
     ];
     console.log(lines.join("\n"));
   },
@@ -144,6 +156,18 @@ async function main(): Promise<void> {
       process.exitCode = 1;
     }
     return ended(target, loadState(dir));
+  }
+  if (verb === "check" && target !== undefined) {
+    const dir = dirOf(target);
+    const problems = check(dir, runnerFor(target, dir));
+    const at = loadState(dir).at;
+    console.log(
+      problems.length === 0
+        ? `${at}: the files check out. Not moved on: the session driving the run runs done.`
+        : `${at} is not finished:\n${problems.map((problem) => `  - ${problem}`).join("\n")}`,
+    );
+    if (problems.length > 0) process.exitCode = 1;
+    return;
   }
   if (verb === "status" && target !== undefined) {
     const state = loadState(dirOf(target));

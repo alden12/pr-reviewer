@@ -4,7 +4,7 @@
  * the folder it is run from, as the home page finds them (`nestedCheckouts`), so a run started from a folder above
  * several repos (at work, above the company's) reviews the right one. The plan is the one in that folder.
  */
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { nestedCheckouts, remoteOf } from "./inbox.ts";
 import { planIn } from "./plan.ts";
@@ -25,13 +25,20 @@ export function parsePrRef(text: string): PrRef | null {
   return named ? { repo: named[1]!, number: Number(named[2]) } : null;
 }
 
+/** The PR's head, which picks between several checkouts of its repo. */
+export interface PrHead {
+  sha: string;
+  branch: string;
+}
+
 /**
  * The checkout of `repo` at or under `root`, by its `origin` remote, as its top level (`root` may be a folder inside
- * the repo, as when a run starts in `packages/reviewer`). Standing in a checkout of it picks that one. Otherwise
- * exactly one must be nested under `root`: with several (a clone and its worktrees beside it), it refuses and lists
- * them rather than reviewing whichever sorts first, and with none it says where it looked.
+ * the repo, as when a run starts in `packages/reviewer`). Standing in a checkout of it picks that one. Otherwise one
+ * nested under `root`; with several (a clone and its worktrees, at work the main checkout and `android-str-1022`), the
+ * one already at the PR's head, then the one on its branch, then the main clone rather than a worktree, and only when
+ * that still leaves more than one does it refuse, listing them. With none it says where it looked.
  */
-export async function cloneOf(repo: string, root: string): Promise<string> {
+export async function cloneOf(repo: string, root: string, head?: () => Promise<PrHead | null>): Promise<string> {
   const wanted = repo.toLowerCase();
   const [own, ...nested] = nestedCheckouts(root);
   const matches = async (checkout: string) => (await remoteOf(checkout))?.toLowerCase() === wanted;
@@ -42,12 +49,42 @@ export async function cloneOf(repo: string, root: string): Promise<string> {
   if (found.length === 0) {
     throw new Error(`no checkout of ${repo} in ${root} or the repos under it: clone it there, or pass --clone <path>`);
   }
-  if (found.length > 1) {
-    throw new Error(
-      `${found.length} checkouts of ${repo} under ${root}, pass --clone with one of:\n  ${found.join("\n  ")}`,
-    );
+  if (found.length === 1) return topLevel(found[0]!);
+  const pr = (await head?.()) ?? null;
+  const git = (checkout: string, args: string[]) =>
+    spawnSync("git", args, { cwd: checkout, encoding: "utf8" }).stdout?.trim() ?? "";
+  const tiers: ((checkout: string) => boolean)[] = [
+    (checkout) => pr !== null && git(checkout, ["rev-parse", "HEAD"]) === pr.sha,
+    (checkout) => pr !== null && git(checkout, ["branch", "--show-current"]) === pr.branch,
+    // A main clone's git dir is its own; a linked worktree's is under the main one's.
+    (checkout) => git(checkout, ["rev-parse", "--git-dir"]) === git(checkout, ["rev-parse", "--git-common-dir"]),
+  ];
+  for (const tier of tiers) {
+    const picked = found.filter(tier);
+    if (picked.length === 1) return topLevel(picked[0]!);
   }
-  return topLevel(found[0]!);
+  throw new Error(
+    `${found.length} checkouts of ${repo} under ${root}, and none is the one to use (at the PR's head, on its branch, or ` +
+      `the only main clone). Pass --clone with one of these: it is where the diff is read from, and where the fix ` +
+      `step finds the PR's branch (the clone or one of its worktrees):\n  ${found.join("\n  ")}`,
+  );
+}
+
+/**
+ * The checkout of `clone`'s repo that has `branch` checked out: the clone itself, or one of its worktrees (`git worktree
+ * list`). The fix step commits on the PR's branch, and at work the clone was on `main` with the branch in a worktree,
+ * so "fix it in the clone" couldn't be done. Undefined when none has it.
+ */
+export function checkoutOn(clone: string, branch: string): string | undefined {
+  const listed = spawnSync("git", ["worktree", "list", "--porcelain"], { cwd: clone, encoding: "utf8" });
+  if (listed.status !== 0) return undefined;
+  return listed.stdout
+    .split("\n\n")
+    .map((entry) => ({
+      path: /^worktree (.+)$/m.exec(entry)?.[1],
+      branch: /^branch refs\/heads\/(.+)$/m.exec(entry)?.[1],
+    }))
+    .find((worktree) => worktree.branch === branch)?.path;
 }
 
 const topLevel = (checkout: string): string =>
@@ -66,6 +103,15 @@ export function runFrom(env: Record<string, string | undefined>): string {
   return from;
 }
 
+/** The PR's head commit and branch from GitHub (REST, as fetch is), or null when it can't be asked. */
+const prHead = async (repo: string, number: number): Promise<PrHead | null> => {
+  const asked = spawnSync("gh", ["api", `repos/${repo}/pulls/${number}`, "-q", '.head.sha + " " + .head.ref'], {
+    encoding: "utf8",
+  });
+  const [sha, branch] = asked.status === 0 ? asked.stdout.trim().split(" ") : [];
+  return sha && branch ? { sha, branch } : null;
+};
+
 /**
  * What `start` reviews: the PR, its checkout and the run's plan. The plan is the one in `from`, refused without one.
  * `clone` (the --clone flag, relative to `from`) is taken with no search, so it settles a search that found several,
@@ -83,7 +129,8 @@ export async function startTarget(
   if (plan === undefined)
     throw new Error(`no attraverso plan in ${from}: start a review from the folder that holds yours`);
   if (clone === undefined) {
-    const found = ref.repo === undefined ? topLevel(from) : await cloneOf(ref.repo, from);
+    const found =
+      ref.repo === undefined ? topLevel(from) : await cloneOf(ref.repo, from, () => prHead(ref.repo!, ref.number));
     return { clone: found, plan, number: ref.number };
   }
   const given = resolve(from, clone);

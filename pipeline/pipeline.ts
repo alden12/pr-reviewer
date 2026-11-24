@@ -27,6 +27,7 @@ import { foldByRules, keepJudged } from "./steps/fold.ts";
 import { loadSyntax } from "./syntax.ts";
 import { DEFAULT_RULES } from "./rules.ts";
 import { nextLists, READER, readingPreferences, repoRules } from "./plan.ts";
+import { checkoutOn } from "./target.ts";
 
 export interface Context {
   work: Workspace;
@@ -202,6 +203,20 @@ export function alikeBrief({ work }: Context): string[] {
     : ["alike:   near-duplicate candidates, for you to fold as repeats or leave:", ...found];
 }
 
+/**
+ * Where the fix step commits: the checkout that has the PR's branch, which needn't be the clone the diff came from (a
+ * clone on `main` with the branch in a worktree beside it).
+ */
+const fixWhere = ({ work, clone }: Context): string[] => {
+  const branch = work.read("pr").head;
+  const where = checkoutOn(clone, branch);
+  return where === undefined
+    ? [
+        `work in:  no checkout has ${branch}: check it out first (gh pr checkout ${work.read("pr").number}), then fix there`,
+      ]
+    : [`work in:  ${where} (it has ${branch} checked out; commit and push there)`];
+};
+
 const fetchStep = async ({ work, clone, number }: Context) => fetchPr(work, clone, number, await loadSyntax());
 
 export const pipeline = {
@@ -227,6 +242,7 @@ export const pipeline = {
     does: "Fix what has a clear answer; put the rest to the reader",
     prompt: "fix.md",
     when: isOwnPr,
+    brief: fixWhere,
     reads: ["pr", "diff", "findings"],
     writes: ["outcomes"],
     verify: everyFindingDecided,
@@ -268,6 +284,9 @@ export const pipeline = {
     brief: alikeBrief,
     does: "Check the folds both ways, and teach the repo's rules what was learned",
     prompt: "judge.md",
+    // Fresh, as review is: it decides what the reader doesn't see, so it mustn't be the session that wrote the PR or
+    // the fix step's commits, which would be the pipeline folding over its own work.
+    fresh: true,
     reads: ["pr", "diff", "findings", "folds"],
     writes: ["folds"],
     verify: foldsFit,

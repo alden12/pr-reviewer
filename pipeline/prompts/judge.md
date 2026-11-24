@@ -33,7 +33,9 @@ Set `source` on every entry you change to `judge: <why>`.
 
 The reader's preferences are the `Reading preferences` section of the reviewer's plan (project `pr-reviewer`):
 prose for you, and a yaml block the fold step reads (`spans: { imports, types, objects }`, each `false` or a line
-count). Follow the prose. Then read the reading logs from past reviews (`*/reading.jsonl` in the folders beside this
+count). Follow the prose. **When the tools serve no `pr-reviewer` project, or it has no such section (a run anywhere
+but the reviewer's own repo), use the defaults and say so in your hand-back**: imports, types and long objects fold as
+the fold step already folded them, and nothing else is assumed about the reader. Then read the reading logs from past reviews (`*/reading.jsonl` in the folders beside this
 review's folder: each line one fold the reader opened or folded back, with its `kind`). Where a pattern holds across
 more than one review (every `types` span opened, `generated` folds never opened), **propose** the change to Alden in
 your hand-back rather than writing it: preferences are his to set. When he has said one outright, write it in.

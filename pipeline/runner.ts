@@ -8,8 +8,9 @@ import { MAX_SENDBACKS_PER_STEP, sendBacksTo } from "./loops.ts";
 import { DONE, following, loadState, logged, saveState, type ReviewState } from "./state.ts";
 
 /**
- * Who runs an agent step. Locally it is the Claude Code session driving the run (the `review-pr` skill), so handing
- * over is printing what to do. A CI run would be a second driver that sends the same prompt to the API with the
+ * Who runs an agent step. Locally it is the Claude Code session driving the run (the `review-pr` skill, which
+ * `pr-reviewer install-skill` puts where a session finds it), so handing over is printing what to do: the session hands
+ * the step to a new agent, and runs `done` itself once that agent has written its files. A CI run would be a second driver that sends the same prompt to the API with the
  * attraverso tools attached, waits, and calls `finish` itself; nothing else here would change.
  */
 export interface AgentDriver {
@@ -80,11 +81,8 @@ export async function advance(dir: string, runner: Runner): Promise<ReviewState>
   return final;
 }
 
-/**
- * The agent step's files are written: validate them against their schemas, then the step's own `verify`. Returns the
- * problems, leaving the step open, or carries on with an empty list.
- */
-export async function finish(dir: string, runner: Runner): Promise<string[]> {
+/** The agent step a review is waiting on, or why there is none to check or finish. */
+function waitingStep(dir: string, runner: Runner): { state: ReviewState; at: StepId; step: AgentStep } {
   const state = loadState(dir);
   if (state.at === DONE || !state.waiting)
     throw new Error(`the review is not waiting on an agent (it is at ${state.at})`);
@@ -92,7 +90,11 @@ export async function finish(dir: string, runner: Runner): Promise<string[]> {
   if (step.by !== "agent") {
     throw new Error(`${state.at} is a code step that stopped the run: see status, then go back to a step by hand`);
   }
-  const context = runner.contextOf(state);
+  return { state, at: state.at, step };
+}
+
+/** What is wrong with the files the step wrote: their schemas first, then the step's own `verify`. */
+const problemsWith = (step: AgentStep, context: Context): string[] => {
   const unreadable = step.writes.flatMap((artefact) => {
     try {
       context.work.read(artefact);
@@ -101,12 +103,32 @@ export async function finish(dir: string, runner: Runner): Promise<string[]> {
       return [cause instanceof Error ? cause.message : String(cause)];
     }
   });
-  const problems = unreadable.length > 0 ? unreadable : (step.verify?.(context) ?? []);
+  return unreadable.length > 0 ? unreadable : (step.verify?.(context) ?? []);
+};
+
+/**
+ * The checks `finish` makes, without moving the run on: safe for the agent that wrote the files, the way running the
+ * tests is. Moving on is a separate act (`finish`), by someone other than that agent, so a step's output is never
+ * written and approved by one actor; Claude Code's auto mode blocks exactly that, and is right to.
+ */
+export function check(dir: string, runner: Runner): string[] {
+  const { state, step } = waitingStep(dir, runner);
+  return problemsWith(step, runner.contextOf(state));
+}
+
+/**
+ * The agent step's files are written: validate them as `check` does. Returns the problems, leaving the step open, or
+ * carries on with an empty list.
+ */
+export async function finish(dir: string, runner: Runner): Promise<string[]> {
+  const { state, at, step } = waitingStep(dir, runner);
+  const context = runner.contextOf(state);
+  const problems = problemsWith(step, context);
   if (problems.length > 0) return problems;
   const reviewedHead = step.recordsHead ? { reviewedHead: context.work.read("pr").headCommit } : {};
   saveState(dir, {
-    ...logged(state, state.at, doneNote(context)),
-    at: following(state.at),
+    ...logged(state, at, doneNote(context)),
+    at: following(at),
     waiting: false,
     problems: [],
     ...reviewedHead,

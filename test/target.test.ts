@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { openPlan } from "attraverso/library";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { nextLists, planIn, repoRules, runPlans } from "../pipeline/plan.ts";
-import { cloneOf, parsePrRef, runFrom, startTarget } from "../pipeline/target.ts";
+import { checkoutOn, cloneOf, parsePrRef, runFrom, startTarget } from "../pipeline/target.ts";
 
 // Opening a plan boots PGlite, a second or more on a busy CI runner (master's run after #164 timed out at vitest's 5s).
 vi.setConfig({ testTimeout: 30_000 });
@@ -28,6 +28,18 @@ const repo = (path: string, remote?: string) => {
   execFileSync("git", ["init", "-q"], { cwd: path });
   if (remote) execFileSync("git", ["remote", "add", "origin", remote], { cwd: path });
   return path;
+};
+const git = (cwd: string, args: string[]) =>
+  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, encoding: "utf8" }).trim();
+/** A clone with a commit on `main`, and a worktree beside it on `feature` (as at work: the clone on main). */
+const cloneWithWorktree = (work: string) => {
+  const main = repo(join(work, "web"), "git@github.com:acme/web.git");
+  git(main, ["checkout", "-q", "-b", "main"]);
+  git(main, ["commit", "-q", "--allow-empty", "-m", "one"]);
+  const tree = join(work, "web-feature");
+  git(main, ["worktree", "add", "-q", "-b", "feature", tree]);
+  git(tree, ["commit", "-q", "--allow-empty", "-m", "two"]);
+  return { main, tree: realpathSync(tree), head: git(tree, ["rev-parse", "HEAD"]) };
 };
 /** A plan whose `work` project holds review rules, written through core's library as a real plan is. */
 const rulesPlan = async (): Promise<string> => {
@@ -88,10 +100,30 @@ describe("cloneOf", () => {
     expect(await cloneOf("acme/api", work)).toBe(join(work, "api"));
   });
 
+  it("picks among a clone and its worktree: the one at the PR's head, then on its branch, then the main clone", async () => {
+    const work = scratch();
+    const { main, tree, head } = cloneWithWorktree(work);
+    expect(await cloneOf("acme/web", work, async () => ({ sha: head, branch: "elsewhere" }))).toBe(tree);
+    expect(await cloneOf("acme/web", work, async () => ({ sha: "0".repeat(40), branch: "feature" }))).toBe(tree);
+    // GitHub unreachable, or the PR's branch checked out nowhere: the main clone, not the worktree.
+    expect(await cloneOf("acme/web", work, async () => null)).toBe(main);
+    expect(await cloneOf("acme/web", work)).toBe(main);
+  });
+
   it("says where it looked when the repo isn't there", async () => {
     const work = scratch();
     repo(join(work, "web"), "git@github.com:acme/web.git");
     await expect(cloneOf("acme/other", work)).rejects.toThrow(/no checkout of acme\/other in .*--clone/);
+  });
+});
+
+describe("checkoutOn", () => {
+  it("finds the checkout with a branch, the clone's own or a worktree's, or none", () => {
+    const work = scratch();
+    const { main, tree } = cloneWithWorktree(work);
+    expect(checkoutOn(main, "feature")).toBe(tree);
+    expect(checkoutOn(tree, "main")).toBe(main);
+    expect(checkoutOn(main, "gone")).toBeUndefined();
   });
 });
 

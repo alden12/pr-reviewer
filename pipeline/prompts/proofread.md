@@ -8,7 +8,8 @@ not the code: the review step already did that.
 ## What it should do
 
 The goal: **the minimum the reader needs, clearly, and more a click away.** Read the reader's `Reading
-preferences` (the reviewer's plan, project `pr-reviewer`, through the attraverso tools) and the reviewed repo's
+preferences` (the reviewer's plan, project `pr-reviewer`, through the attraverso tools; when there is no such project
+or section, the defaults: nothing assumed beyond this prompt) and the reviewed repo's
 `Review rules`; then check, at every heading and every run of code:
 
 1. **Every heading earns its place, and matches what is under it.** A heading naming something that is folded away

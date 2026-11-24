@@ -11,6 +11,32 @@ names in the repo's attraverso plan, for what it was meant to do.
 
 ## Write `narrative.json`
 
+Its shape, with every field (the optional ones marked by the notes below; `verdict` is one of the three). `blocks` is
+keyed by the file's path, with one entry per hunk in the file's order, as many as `diff.json` has hunks for it:
+
+```json
+{
+  "gist": "what the PR does for its user, in a sentence or two",
+  "tryIt": "gh pr checkout 42 && yarn dev",
+  "verdict": "approve",
+  "steps": [{ "id": "load", "title": "Where the list comes from", "short": "Load", "files": ["src/load.ts"] }],
+  "blocks": {
+    "src/load.ts": [
+      {
+        "title": "what this hunk does",
+        "why": "only when the title doesn't make it obvious",
+        "explains": [12],
+        "sections": [{ "line": 10, "title": "what the part from line 10 does", "why": "optional" }],
+        "hints": [{ "line": 14, "text": "a few words on a dense line" }]
+      }
+    ]
+  },
+  "notForReview": [{ "path": "yarn.lock", "why": "the lockfile, from the package.json change" }],
+  "tests": { "files": ["test/load.test.ts"], "tested": ["loading an empty list"] },
+  "names": { "loadList": { "what": "reads the list from disk", "trace": true } }
+}
+```
+
 - **`gist`**: what the PR does for its user, in a sentence or two. Not a list of files.
 - **`tryIt`**: the command to see it working (`gh pr checkout <n> && ...`).
 - **`verdict`**: `approve`, `comment` or `request-changes`. Never milder than a finding left open: one that requests
@@ -19,7 +45,7 @@ names in the repo's attraverso plan, for what it was meant to do.
   not alphabetical. Each `{ id, title, short?, files }`. Every changed file is in a step, in `tests.files`, or in
   `notForReview` with a reason (lockfiles, the plan file, generated output).
 - **`blocks`**: for each file in a step, one heading per hunk, in order: `{ title, why?, explains?, sections?,
-  hints? }`. The title says what the hunk does; `why` only when it isn't obvious from the title. A folded hunk still
+hints? }`. The title says what the hunk does; `why` only when it isn't obvious from the title. A folded hunk still
   needs a heading, since it is what the reader sees in its place. `explains` lists the new line numbers of code
   comments worth reading as the explanation.
 - **`sections`** on a block: storytelling headings inside it, `{ line, title, why? }` at the new line a part starts
